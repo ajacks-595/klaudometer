@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name=""/>
+    <group name="General">
+        <entry name="refreshMinutes" type="Int">
+            <default>3</default>
+        </entry>
+        <entry name="showRemaining" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="showFiveHour" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="showSevenDay" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="showExtra" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="colorByLevel" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="warningThreshold" type="Int">
+            <default>75</default>
+        </entry>
+        <entry name="criticalThreshold" type="Int">
+            <default>90</default>
+        </entry>
+    </group>
+    <group name="Appearance">
+        <entry name="theme" type="String">
+            <default>claude</default>
+        </entry>
+        <entry name="customFiveHour" type="Color">
+            <default>#D97757</default>
+        </entry>
+        <entry name="customSevenDay" type="Color">
+            <default>#6A9BCC</default>
+        </entry>
+        <entry name="customSpend" type="Color">
+            <default>#8DB06E</default>
+        </entry>
+        <entry name="customWarning" type="Color">
+            <default>#E8A33D</default>
+        </entry>
+        <entry name="customCritical" type="Color">
+            <default>#E5484D</default>
+        </entry>
+        <entry name="panelStyle" type="String">
+            <default>standard</default>
+        </entry>
+        <entry name="segmentedRings" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="showElapsedTick" type="Bool">
+            <default>true</default>
+        </entry>
+    </group>
+    <group name="Spending">
+        <entry name="showApi" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="apiBudget" type="Int">
+            <default>100</default>
+        </entry>
+    </group>
+    <group name="Notifications">
+        <entry name="notifyWarning" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="notifyCritical" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="notifyReset" type="Bool">
+            <default>false</default>
+        </entry>
+    </group>
+</kcfg>

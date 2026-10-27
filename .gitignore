@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+
+# Built packages
+*.plasmoid
+
+# Editor and file-manager clutter
+.directory
+*.swp
+*~

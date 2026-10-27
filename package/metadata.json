@@ -1,0 +1,15 @@
+{
+    "KPlugin": {
+        "Id": "io.github.ajacks-595.klaudometer",
+        "Name": "Klaudometer",
+        "Description": "Your Claude subscription's 5-hour and 7-day usage at a glance",
+        "Icon": "speedometer",
+        "Authors": [{ "Name": "Alex Jackson" }],
+        "Category": "System Information",
+        "License": "MIT",
+        "Version": "1.0",
+        "FormFactors": ["desktop", "panel"]
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
