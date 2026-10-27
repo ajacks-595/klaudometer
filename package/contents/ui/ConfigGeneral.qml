@@ -10,6 +10,7 @@ KCM.SimpleKCM {
     property alias cfg_showSevenDay: sevenDayCheck.checked
     property alias cfg_showExtra: extraCheck.checked
     property alias cfg_colorByLevel: colorByLevelCheck.checked
+    property alias cfg_showPace: paceCheck.checked
     property alias cfg_warningThreshold: warningSpin.value
     property alias cfg_criticalThreshold: criticalSpin.value
 
@@ -54,6 +55,12 @@ KCM.SimpleKCM {
             text: i18n("How much is left")
             checked: cfg_showRemaining
             onToggled: cfg_showRemaining = checked
+        }
+
+        QQC2.CheckBox {
+            id: paceCheck
+            Kirigami.FormData.label: i18n("Pace:")
+            text: i18n("Project where usage is heading (\"Runs out in ~1h 20m\")")
         }
 
         Item {

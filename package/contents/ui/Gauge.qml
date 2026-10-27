@@ -131,4 +131,16 @@ ColumnLayout {
         opacity: 0.65
         elide: Text.ElideRight
     }
+
+    PlasmaComponents3.Label {
+        readonly property string pace: Plasmoid.configuration.showPace ? gauge.plasmoidItem.paceText(gauge.info) : ""
+        Layout.fillWidth: true
+        horizontalAlignment: Text.AlignHCenter
+        visible: pace !== ""
+        text: pace
+        font: Kirigami.Theme.smallFont
+        color: gauge.info.runsOut ? gauge.plasmoidItem.colors.warning : Kirigami.Theme.textColor
+        opacity: gauge.info.runsOut ? 1 : 0.65
+        elide: Text.ElideRight
+    }
 }

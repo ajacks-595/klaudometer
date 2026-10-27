@@ -12,7 +12,7 @@ ColumnLayout {
 
     readonly property int count: plasmoidItem.meterIds.length
     // Room left for the rings once the header, footer and captions are laid out.
-    readonly property real captionsHeight: Kirigami.Units.gridUnit * 3.4
+    readonly property real captionsHeight: Kirigami.Units.gridUnit * (plasmoidItem.cfg.showPace ? 4.3 : 3.4)
     readonly property real ringSize: Math.max(Kirigami.Units.gridUnit * 3, Math.min(
         Kirigami.Units.gridUnit * 9,
         (width - gauges.spacing * (count - 1)) / count * 0.8,

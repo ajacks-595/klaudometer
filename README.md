@@ -16,6 +16,12 @@ Telling the meters apart:
 
 Rings switch to the warning colour at 75% and to the critical colour at 90% (both adjustable).
 
+**Pace:** each meter projects where you'll end up at your average rate so far, for example
+"On pace for ~82%", or "Runs out in ~42m" in the warning colour when you'll hit the limit
+before it resets. It appears once a tenth of the window (or month) has passed, so early
+guesses aren't noise. In the panel's *Detailed* style, "out in ~42m" replaces the reset time
+when that's the more urgent news.
+
 ## Install / update
 
 ```bash
@@ -36,6 +42,7 @@ Right-click the widget and choose **Configure Klaudometer…**
 - How often to check (default every 3 minutes)
 - What to show: the 5-hour window, the 7-day window, and extra usage (only appears while extra usage is turned on for your plan)
 - Whether numbers show usage *used* or usage *left*
+- Whether to show the pace projection (on by default)
 - Warning and critical levels, used for ring colours and notifications (colour changes can be turned off)
 
 **Appearance**
@@ -54,6 +61,7 @@ Right-click the widget and choose **Configure Klaudometer…**
 **Notifications**
 - A desktop notification when a meter reaches the warning or critical level (on by default).
   For API spend the levels are a share of your budget.
+- A notification when a meter is on pace to run out before it resets (off by default)
 - A notification when a window resets (off by default)
 - A *Send Test Notification* button
 - Each alert is sent once per window or month, even with the widget on several panels. The copies share a

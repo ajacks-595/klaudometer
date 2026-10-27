@@ -100,9 +100,19 @@ MouseArea {
                         Layout.alignment: compact.vertical ? Qt.AlignHCenter : Qt.AlignLeft
                         visible: compact.panelStyle === "detailed"
                             && (cell.info.money ? cell.info.hasData : cell.info.secondsLeft > 0)
+                        // Running out before the reset matters more than when
+                        // the reset is, so it takes this line over.
+                        readonly property bool warnPace: Plasmoid.configuration.showPace
+                            && cell.info.runsOut && cell.info.used < 100
+                        color: warnPace ? compact.plasmoidItem.colors.warning : Kirigami.Theme.textColor
                         text: {
                             const item = compact.plasmoidItem;
                             const info = cell.info;
+                            if (warnPace) {
+                                const when = item.formatDuration(info.secondsToLimit);
+                                return compact.vertical ? "~" + when
+                                    : info.money ? i18n("over in ~%1", when) : i18n("out in ~%1", when);
+                            }
                             if (info.money) {
                                 const spent = item.formatMoney(info.spent, info.currency);
                                 return info.limit && !compact.vertical
@@ -112,7 +122,7 @@ MouseArea {
                             return compact.vertical ? left : i18n("resets %1", left);
                         }
                         font: Kirigami.Theme.smallFont
-                        opacity: 0.7
+                        opacity: warnPace ? 1 : 0.7
                     }
                 }
             }

@@ -9,6 +9,7 @@ KCM.SimpleKCM {
     property alias cfg_notifyWarning: warningCheck.checked
     property alias cfg_notifyCritical: criticalCheck.checked
     property alias cfg_notifyReset: resetCheck.checked
+    property alias cfg_notifyPace: paceCheck.checked
     // Shown in the labels; edited on the General page.
     property int cfg_warningThreshold
     property int cfg_criticalThreshold
@@ -23,6 +24,11 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: criticalCheck
             text: i18n("When a meter reaches the critical level (%1%)", cfg_criticalThreshold)
+        }
+
+        QQC2.CheckBox {
+            id: paceCheck
+            text: i18n("When a meter is on pace to run out before it resets")
         }
 
         QQC2.CheckBox {
