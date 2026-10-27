@@ -1,7 +1,15 @@
 # Klaudometer
 
-A KDE Plasma 6 widget that shows how much of your Claude subscription's **5-hour** and **7-day** limits you've used.
+Shows how much of your Claude subscription's **5-hour** and **7-day** limits you've used.
 It can also show your subscription's **extra usage** and your **Claude API spend** for the month.
+
+It comes in two forms:
+
+- **A KDE Plasma 6 widget** for the desktop and panel. That's most of this README.
+- **A [tray icon](#tray-icon-gnome-xfce-cinnamon-and-others)** for GNOME, XFCE, Cinnamon, MATE,
+  Budgie, LXQt and Plasma 5.
+
+## Plasma widget
 
 - **Desktop:** a card with one ring per meter, how much is left, and when each one resets.
 - **Panel:** small rings with the percentage inside. Click to open the card,
@@ -24,8 +32,8 @@ when that's the more urgent news.
 
 ## Requirements
 
-Klaudometer is a **KDE Plasma 6** widget. It runs on any distro with Plasma 6. It doesn't run on
-GNOME, Cinnamon, XFCE or other desktops, or on Plasma 5.
+The widget runs on any distro with **KDE Plasma 6**. On other desktops, or on Plasma 5, use the
+[tray icon](#tray-icon-gnome-xfce-cinnamon-and-others) instead.
 
 | Distro | Plasma | Status |
 |---|---|---|
@@ -146,10 +154,58 @@ If your system has no wallet service, put the key on its own in `~/.config/klaud
 make the file private with `chmod 600 ~/.config/klaudometer/admin-key`. Klaudometer refuses a key file
 that other users can read.
 
+## Tray icon (GNOME, XFCE, Cinnamon and others)
+
+For desktops that can't run Plasma widgets, Klaudometer can sit in the system tray instead. It works
+anywhere that shows StatusNotifierItem / AppIndicator tray icons: GNOME (with the AppIndicator
+extension), XFCE, Cinnamon, MATE, Budgie, LXQt and KDE Plasma 5 or 6.
+
+- **Icon:** two rings, the 5-hour window inside and the 7-day window outside. They use the same
+  colours as the widget and switch to the warning or critical colour as usage rises.
+- **Label:** on GNOME the percentages appear next to the icon, for example `32% · 70%`. KDE and
+  some other trays don't draw tray labels.
+- **Menu:** each meter's usage, reset time and pace, plus extra usage and API spend if you use
+  them. It also has Refresh Now, a link to Claude's usage page, notification toggles, and
+  Edit Settings….
+- **Notifications:** the same alerts as the widget. They share the widget's record of what's been
+  sent, so running both never doubles up.
+
+```bash
+tray/install.sh
+```
+
+This checks what's needed, installs to `~/.local/share/klaudometer-tray/`, adds a menu entry, starts
+the icon, and starts it again whenever you log in. Other options: `tray/install.sh --check` only
+checks, `--no-autostart` skips the login start, and `--uninstall` removes it (your settings stay).
+
+**Packages it needs** (most GNOME desktops already have them):
+
+| Distro | Packages |
+|---|---|
+| Debian, Ubuntu | `python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1` |
+| Fedora | `python3-gobject gtk3 libayatana-appindicator-gtk3` |
+| Arch | `python-gobject gtk3 libayatana-appindicator` |
+| openSUSE | `python3-gobject python3-gobject-Gdk typelib-1_0-Gtk-3_0 typelib-1_0-AyatanaAppIndicator3-0_1` |
+
+**GNOME needs the AppIndicator extension** to show any tray icon:
+- **Ubuntu:** ships it turned on.
+- **Fedora, Debian and Arch:** install `gnome-shell-extension-appindicator`, log out and back in,
+  then turn it on in the Extensions app.
+- **openSUSE:** get "AppIndicator and KStatusNotifierItem Support" from extensions.gnome.org.
+
+The installer warns you if it's off.
+
+**Settings** live in `~/.config/klaudometer/tray.ini`; open it from Edit Settings… in the menu.
+You can choose what to show, used or left, the label style, theme or single colours, warning
+levels, pace, and notifications. Changes apply within about 20 seconds.
+
+`python3 tray/klaudometer_tray.py --print` prints the current status once, without a tray, which
+is handy for scripts or a terminal.
+
 ## How it gets the numbers
 
-`package/contents/code/fetch_usage.py` does all the fetching. It only talks to `api.anthropic.com`,
-and there's no telemetry.
+`package/contents/code/fetch_usage.py` does all the fetching for both the widget and the tray icon.
+It only talks to `api.anthropic.com`, and there's no telemetry.
 
 - **Subscription limits and extra usage:** it reads the login Claude Code stores in
   `~/.claude/.credentials.json` and calls `https://api.anthropic.com/api/oauth/usage`, the same
