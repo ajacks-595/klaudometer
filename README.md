@@ -42,7 +42,9 @@ The widget runs on any distro with **KDE Plasma 6**. On other desktops, or on Pl
 | Debian 13 (trixie) | 6.3 | Everything needed comes with `kde-plasma-desktop` |
 | Arch Linux, Manjaro, EndeavourOS | 6.8 | Everything needed comes with `plasma-desktop` |
 | openSUSE Tumbleweed | 6.8 | Everything needed comes with the `kde_plasma` pattern |
-| Kubuntu 24.04 LTS, Debian 12 | 5.27 | **Not supported** (Plasma 5) |
+| openSUSE Leap 16 | 6.4 | Ships Plasma 6, so it should work; packages not checked |
+| Kubuntu 24.04 LTS, Debian 12 | 5.27 | **Not supported** (Plasma 5); use the tray icon |
+| Kubuntu 22.04 LTS | 5.24 | **Not supported** (Plasma 5); use the tray icon |
 
 The widget itself has only been run on Fedora. For the other distros, I checked that each
 standard Plasma install includes every package the widget needs, and ran the helper under that
@@ -162,8 +164,9 @@ extension), XFCE, Cinnamon, MATE, Budgie, LXQt and KDE Plasma 5 or 6.
 
 - **Icon:** two rings, the 5-hour window inside and the 7-day window outside. They use the same
   colours as the widget and switch to the warning or critical colour as usage rises.
-- **Label:** on GNOME the percentages appear next to the icon, for example `32% · 70%`. KDE and
-  some other trays don't draw tray labels.
+- **Label:** trays that support text labels show the percentages next to the icon, for example
+  `32% · 70%`. Many don't: in testing, GNOME's AppIndicator extension (Ubuntu 24.04), KDE and XFCE all
+  showed just the icon. The numbers are always in the menu.
 - **Menu:** each meter's usage, reset time and pace, plus extra usage and API spend if you use
   them. It also has Refresh Now, a link to Claude's usage page, notification toggles, and
   Edit Settings….
@@ -177,6 +180,10 @@ tray/install.sh
 This checks what's needed, installs to `~/.local/share/klaudometer-tray/`, adds a menu entry, starts
 the icon, and starts it again whenever you log in. Other options: `tray/install.sh --check` only
 checks, `--no-autostart` skips the login start, and `--uninstall` removes it (your settings stay).
+
+I checked that the installer's package list installs cleanly and the icon's code runs on Debian 12 and
+13, Ubuntu 22.04, 24.04 and 26.04, Fedora 44, Arch, and openSUSE Tumbleweed and Leap 16 (Python 3.10
+to 3.14).
 
 **Packages it needs** (most GNOME desktops already have them):
 

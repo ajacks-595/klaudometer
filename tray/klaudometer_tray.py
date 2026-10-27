@@ -88,7 +88,8 @@ api_budget = {api_budget}
 # Numbers show usage used (no) or usage left (yes).
 show_remaining = {show_remaining}
 
-# Text next to the icon, where the desktop supports it (GNOME does, KDE doesn't):
+# Text next to the icon, for trays that show labels (many, including GNOME's
+# AppIndicator extension, KDE and XFCE, don't):
 # full ("5h 32% · 7d 70%"), compact ("32% · 70%") or off.
 label = {label}
 
