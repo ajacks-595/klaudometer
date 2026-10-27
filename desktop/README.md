@@ -33,6 +33,22 @@ front ends share one cache, and an alert is only sent once.
 `$ANTHROPIC_ADMIN_KEY` overrides the stored key, `$CLAUDE_CONFIG_DIR` changes where Claude Code's
 login is read from, and `$KLAUDOMETER_API_BASE` points everything at another server, for testing.
 
+## Builds
+
+The [Desktop app workflow](../.github/workflows/desktop.yml) builds a universal macOS `.dmg` and
+Windows `.msi` and `.exe` installers on every push. Each build is smoke-tested on a real Mac and
+Windows machine against a mock of Anthropic's API (`.github/scripts/`), and the screenshots it takes
+are uploaded with the installers.
+
+The builds aren't signed yet, so:
+
+- **macOS** blocks the app the first time. Open it from **System Settings › Privacy & Security ›
+  Open Anyway**.
+- **Windows** SmartScreen may warn about an unknown publisher. Choose **More info › Run anyway**.
+- **Windows 11** puts new tray icons in the hidden icons area (the **^** by the clock). Drag
+  Klaudometer's icon onto the taskbar, or turn it on in **Settings › Personalization › Taskbar ›
+  Other system tray icons**.
+
 ## Develop
 
 You need Rust and, on Linux, the WebKitGTK and AppIndicator development packages. On Fedora:
