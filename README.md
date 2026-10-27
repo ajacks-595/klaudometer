@@ -9,6 +9,29 @@ It comes in two forms:
 - **A [tray icon](#tray-icon-gnome-xfce-cinnamon-and-others)** for GNOME, XFCE, Cinnamon, MATE,
   Budgie, LXQt and Plasma 5.
 
+> **Unofficial.** Klaudometer isn't made by, affiliated with or endorsed by Anthropic. Read the
+> [disclaimer](#disclaimer) before using it.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/desktop-card.png" alt="The desktop card: segmented 5-hour and 7-day rings and an API spend ring, each with how much is left, reset time and pace" width="600">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/panel-standard.png" alt="Panel, Standard style: coloured 5h and 7d labels beside two small rings" height="44">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/panel-detailed.png" alt="Panel, Detailed style: rings with labels and reset countdowns" height="44">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/settings-appearance.png" alt="Appearance settings: theme with colour preview, panel style and ring options" width="420">
+  &nbsp;
+  <img src="docs/screenshots/tray-menu-gnome.png" alt="The tray icon's menu on GNOME, with usage, reset times, pace and API spend" width="420">
+</p>
+
+All screenshots use made-up numbers.
+
 ## Plasma widget
 
 - **Desktop:** a card with one ring per meter, how much is left, and when each one resets.
@@ -95,8 +118,15 @@ your user. It uses `kpackagetool6` if it's there, or copies the widget into
 `~/.local/share/plasma/plasmoids/` if not. Then right-click the desktop or panel, choose
 **Add or Manage Widgets**, and pick **Klaudometer**.
 
+**From a release:** download `klaudometer-<version>.plasmoid` from the Releases page. Then right-click
+the desktop and choose **Add or Manage Widgets › Get New › Install Widget From Local File…**, or run
+`kpackagetool6 -t Plasma/Applet -i klaudometer-<version>.plasmoid`. This skips the installer's
+dependency check, so if the widget won't load, run `./install.sh --check` from a source copy.
+
 Each panel and desktop gets its own copy with its own settings. After an update, run
 `systemctl --user restart plasma-plasmashell` so widgets already placed pick up the new code.
+
+To build the `.plasmoid` yourself, run `./build.sh`; it writes `dist/klaudometer-<version>.plasmoid`.
 
 Uninstall: `kpackagetool6 -t Plasma/Applet -r io.github.ajacks-595.klaudometer`, or delete
 `~/.local/share/plasma/plasmoids/io.github.ajacks-595.klaudometer`.
@@ -164,9 +194,8 @@ extension), XFCE, Cinnamon, MATE, Budgie, LXQt and KDE Plasma 5 or 6.
 
 - **Icon:** two rings, the 5-hour window inside and the 7-day window outside. They use the same
   colours as the widget and switch to the warning or critical colour as usage rises.
-- **Label:** trays that support text labels show the percentages next to the icon, for example
-  `32% · 70%`. Many don't: in testing, GNOME's AppIndicator extension (Ubuntu 24.04), KDE and XFCE all
-  showed just the icon. The numbers are always in the menu.
+- **Label:** on GNOME the percentages appear next to the icon, for example `32% · 70%`. KDE and XFCE
+  show only the icon; the numbers are always in the menu.
 - **Menu:** each meter's usage, reset time and pace, plus extra usage and API spend if you use
   them. It also has Refresh Now, a link to Claude's usage page, notification toggles, and
   Edit Settings….
@@ -226,3 +255,38 @@ It only talks to `api.anthropic.com`, and there's no telemetry.
 - You can run it by hand: `python3 package/contents/code/fetch_usage.py --sources sub,api`.
   For testing, `KLAUDOMETER_API_BASE` points it at another server, and `ANTHROPIC_ADMIN_KEY`
   overrides the wallet.
+
+## Known limitations
+
+- **API spend and extra usage** have only been tested against a stand-in for Anthropic's API.
+  Neither has run with a real Admin API key or with extra usage actually turned on.
+- **Expired logins:** if Claude Code isn't used for a few hours, its login token expires. Klaudometer
+  runs `claude auth status`, but it hasn't been confirmed whether that renews the token. Opening
+  Claude Code always does, and the widget catches up on its next check.
+- **Display:** the widget has been checked in a dark theme at 100% scaling. Light themes and high-DPI
+  scaling haven't been checked yet.
+- **Not shown yet:** per-model weekly limits (Opus, Sonnet) on Max plans.
+- **Notifications** from the Plasma widget name "Plasma" as the sender.
+- **Tray labels:** KDE and XFCE show only the tray icon, not the text label next to it.
+
+## Disclaimer
+
+Klaudometer is an unofficial, independent project. It isn't made, endorsed or supported by Anthropic.
+"Claude" and "Claude Code" are trademarks of Anthropic, used here only to say what Klaudometer works with.
+
+- **Undocumented endpoint:** the subscription numbers come from an endpoint Claude Code itself uses,
+  which Anthropic doesn't document. It can change or stop working at any time.
+- **Your Claude Code login:** to fetch those numbers, Klaudometer reads the login Claude Code stores on
+  your computer and sends it only to `api.anthropic.com`, the same place Claude Code sends it. It never
+  stores, copies or sends the login anywhere else, and it never refreshes it.
+- **Anthropic's terms:** these describe Claude Code's login as intended for Claude Code and
+  Anthropic's own apps. Klaudometer is neither, so use the subscription meters at your own risk.
+- **API spend:** this uses your own Admin API key, and the terms explicitly allow managing your own
+  API keys.
+- **No telemetry:** the only network requests go to `api.anthropic.com`.
+
+Klaudometer is provided as is, without warranty of any kind. See the [license](LICENSE).
+
+## License
+
+[MIT](LICENSE) © 2026 Alex Jackson

@@ -7,7 +7,7 @@
         "Authors": [{ "Name": "Alex Jackson" }],
         "Category": "System Information",
         "License": "MIT",
-        "Version": "1.0",
+        "Version": "1.0.0",
         "FormFactors": ["desktop", "panel"]
     },
     "KPackageStructure": "Plasma/Applet",

@@ -88,8 +88,8 @@ api_budget = {api_budget}
 # Numbers show usage used (no) or usage left (yes).
 show_remaining = {show_remaining}
 
-# Text next to the icon, for trays that show labels (many, including GNOME's
-# AppIndicator extension, KDE and XFCE, don't):
+# Text next to the icon, for trays that show labels (GNOME does; KDE and
+# XFCE don't):
 # full ("5h 32% · 7d 70%"), compact ("32% · 70%") or off.
 label = {label}
 
@@ -505,6 +505,8 @@ class Tray:
         self.indicator.set_status(Indicator.IndicatorStatus.ACTIVE)
         self.indicator.set_title("Klaudometer")
         self.indicator.set_icon_theme_path(ICON_DIR)
+        self.label = ""
+        self.indicator.connect("connection-changed", self._on_connection_changed)
         self.update()
         self.refresh(False)
         self.refresh_timer = GLib.timeout_add_seconds(self._refresh_seconds(), self._on_refresh_timer)
@@ -594,7 +596,25 @@ class Tray:
             stale = os.path.join(ICON_DIR, f"klaudometer-{os.getpid()}-{self.icon_counter - 2}.svg")
             if os.path.exists(stale):
                 os.remove(stale)
+        self.label = label
         self.indicator.set_label(label, "")
+
+    def _on_connection_changed(self, _indicator, connected):
+        # A tray that turns up after we start (GNOME's extension loading late
+        # at login) ignores the label we already had and only shows later
+        # changes. Once it has had a moment to start listening, blank the
+        # label and put it back.
+        if connected:
+            self.GLib.timeout_add(2000, self._blank_label)
+
+    def _blank_label(self):
+        self.indicator.set_label("", "")
+        self.GLib.timeout_add(500, self._restore_label)
+        return False
+
+    def _restore_label(self):
+        self.indicator.set_label(self.label, "")
+        return False
 
     def _set_menu(self, rows):
         keys = [key for key, _, _ in rows]
