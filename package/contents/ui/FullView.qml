@@ -34,6 +34,8 @@ ColumnLayout {
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Kirigami.Units.iconSizes.small
             source: "speedometer"
+            // Not every icon theme has a speedometer.
+            fallback: "utilities-system-monitor"
         }
 
         PlasmaComponents3.Label {

@@ -8,8 +8,9 @@ Two sources, picked with --sources:
        ~/.claude/.credentials.json and calls the endpoint Claude Code's /usage
        screen uses.
   api  Claude API spend for the current month, from the Console organization's
-       cost report. Needs an Admin API key, read from the desktop's Secret
-       Service (KDE Wallet / GNOME Keyring) or $ANTHROPIC_ADMIN_KEY.
+       cost report. Needs an Admin API key, read from $ANTHROPIC_ADMIN_KEY,
+       the desktop's Secret Service (KDE Wallet / GNOME Keyring), or a
+       private key file for systems without one.
 
 Always prints exactly one JSON object on stdout. When a fetch fails, the last
 good result is returned with "stale": true and a human-readable "error".
@@ -26,6 +27,7 @@ With --check-key it only reports whether an Admin API key can be found.
 """
 import argparse
 import fcntl
+import glob
 import json
 import os
 import shutil
@@ -51,6 +53,16 @@ LOCK_PATH = os.path.join(CACHE_DIR, "fetch.lock")
 CLAIMS_PATH = os.path.join(CACHE_DIR, "notified.json")
 # Secret Service attributes the Admin API key is stored under.
 KEY_ATTRIBUTES = ["service", "klaudometer", "key", "admin"]
+# Fallback for systems without a Secret Service; must be readable only by you.
+KEY_FILE = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "klaudometer", "admin-key"
+)
+# Where Claude Code's CLI usually lives. Plasma's PATH often lacks the per-user
+# ones (native installer, npm/bun/volta globals, the old ~/.claude/local).
+CLAUDE_DIRS = [
+    "~/.local/bin", "~/.claude/local", "~/.npm-global/bin", "~/.bun/bin",
+    "~/.volta/bin", "~/bin", "/usr/local/bin",
+]
 
 WINDOWS = {"five_hour": 5 * 3600, "seven_day": 7 * 86400}
 ERROR_RETRY_SECONDS = 60
@@ -108,7 +120,8 @@ def refresh_via_cli():
     We never refresh the token ourselves: refresh tokens rotate, and racing
     Claude Code for one could log it out.
     """
-    extra = [os.path.expanduser(p) for p in ("~/.local/bin", "~/.npm-global/bin", "~/bin")]
+    extra = [os.path.expanduser(p) for p in CLAUDE_DIRS]
+    extra += sorted(glob.glob(os.path.expanduser("~/.nvm/versions/node/*/bin")), reverse=True)
     path = os.pathsep.join(extra + [os.environ.get("PATH", "/usr/bin:/bin")])
     claude = shutil.which("claude", path=path)
     if not claude:
@@ -224,25 +237,49 @@ def fetch_subscription(now):
 
 # --- Claude API spend ------------------------------------------------------
 
-def load_admin_key():
-    """Return (key, where it came from). The key is never printed or cached."""
-    key = os.environ.get("ANTHROPIC_ADMIN_KEY")
-    if key:
-        return key, "environment"
+def wallet_key():
+    """The key from the Secret Service, or None if there's no tool, service or key."""
     tool = shutil.which("secret-tool")
     if not tool:
-        raise FetchError("secret-tool isn't installed, so the Admin API key can't be read.", 3600)
+        return None
     try:
         out = subprocess.run(
             [tool, "lookup", *KEY_ATTRIBUTES],
             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60,
         )
     except (OSError, subprocess.SubprocessError):
-        raise FetchError("Couldn't read the Admin API key from your wallet.")
-    key = out.stdout.strip()
-    if out.returncode != 0 or not key:
-        raise FetchError("No Admin API key stored. See Klaudometer's Spending settings.", 300)
-    return key, "wallet"
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def file_key():
+    """The key from KEY_FILE, or None if it doesn't exist. Refuses a file
+    others can read."""
+    try:
+        with open(KEY_FILE) as f:
+            if os.fstat(f.fileno()).st_mode & 0o077:
+                raise FetchError(f"{KEY_FILE} must be private. Run: chmod 600 {KEY_FILE}", 300)
+            return f.read().strip() or None
+    except FileNotFoundError:
+        return None
+    except OSError:
+        raise FetchError(f"Couldn't read {KEY_FILE}.", 300)
+
+
+def load_admin_key():
+    """Return (key, where it came from). The key is never printed or cached."""
+    key = os.environ.get("ANTHROPIC_ADMIN_KEY")
+    if key:
+        return key, "environment"
+    key = wallet_key()
+    if key:
+        return key, "wallet"
+    key = file_key()
+    if key:
+        return key, "file"
+    if not shutil.which("secret-tool"):
+        raise FetchError("No Admin API key found, and secret-tool isn't installed. See Klaudometer's Spending settings.", 300)
+    raise FetchError("No Admin API key stored. See Klaudometer's Spending settings.", 300)
 
 
 def fetch_api_spend(now):

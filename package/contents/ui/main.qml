@@ -3,7 +3,6 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.kirigami as Kirigami
-import org.kde.notification
 import "Themes.js" as Themes
 
 PlasmoidItem {
@@ -20,6 +19,9 @@ PlasmoidItem {
     // messages waiting on its answer.
     property var knownAlerts: ({})
     property var pendingAlerts: ({})
+    // Created at runtime so a missing KNotifications QML module only turns
+    // alerts off; see Notifier.qml.
+    readonly property Component notifier: Qt.createComponent("Notifier.qml")
 
     readonly property var cfg: Plasmoid.configuration
     readonly property string scriptPath: decodeURIComponent(
@@ -386,7 +388,7 @@ PlasmoidItem {
             return {
                 title: i18n("Claude %1 limit has reset", m.name),
                 text: i18n("Your full %1 allowance is available again.", m.name),
-                urgency: Notification.LowUrgency,
+                level: "low",
             };
         }
         if (kind === "pace") {
@@ -394,27 +396,27 @@ PlasmoidItem {
                 title: i18n("Claude API spend on pace to pass your budget"),
                 text: i18n("At this rate you'll spend ~%1 this month (budget %2).",
                            formatMoney(m.spent / m.elapsed, m.currency), formatMoney(m.limit, m.currency)),
-                urgency: Notification.NormalUrgency,
+                level: "normal",
             } : {
                 title: i18n("Claude %1 limit: on pace to run out", m.name),
                 text: i18n("At this rate you'll hit it in ~%1, %2 before it resets.",
                            formatDuration(m.secondsToLimit), formatDuration(m.secondsLeft - m.secondsToLimit)),
-                urgency: Notification.NormalUrgency,
+                level: "normal",
             };
         }
         const critical = kind.startsWith("critical");
-        const urgency = critical ? Notification.HighUrgency : Notification.NormalUrgency;
+        const level = critical ? "high" : "normal";
         if (m.money) {
             const spent = formatMoney(m.spent, m.currency);
             const limit = formatMoney(m.limit, m.currency);
             return m.id === "api" ? {
                 title: i18n("Claude API spend at %1% of budget", Math.round(m.used)),
                 text: i18n("%1 of your %2 monthly budget spent.", spent, limit),
-                urgency: urgency,
+                level: level,
             } : {
                 title: i18n("Claude extra usage at %1% of your limit", Math.round(m.used)),
                 text: i18n("%1 of %2 used this month.", spent, limit),
-                urgency: urgency,
+                level: level,
             };
         }
         let text = critical ? i18n("Only %1% left.", Math.round(m.left)) : i18n("%1% left.", Math.round(m.left));
@@ -424,7 +426,7 @@ PlasmoidItem {
         return {
             title: i18n("Claude %1 usage at %2%", m.name, Math.round(m.used)),
             text: text,
-            urgency: urgency,
+            level: level,
         };
     }
 
@@ -437,8 +439,8 @@ PlasmoidItem {
         }
         for (const id of claimed) {
             const alert = pendingAlerts[id];
-            if (alert) {
-                notificationComponent.createObject(root, alert).sendEvent();
+            if (alert && notifier.status === Component.Ready) {
+                notifier.createObject(root, alert).sendEvent();
             }
         }
         const requested = /--claim '([^']+)'/g;
@@ -526,18 +528,6 @@ PlasmoidItem {
                 });
             }
             root.checkAlerts();
-        }
-    }
-
-    Component {
-        id: notificationComponent
-
-        Notification {
-            componentName: "plasma_workspace"
-            eventId: "notification"
-            iconName: "speedometer"
-            autoDelete: false
-            onClosed: destroy()
         }
     }
 

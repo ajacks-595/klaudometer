@@ -22,17 +22,74 @@ before it resets. It appears once a tenth of the window (or month) has passed, s
 guesses aren't noise. In the panel's *Detailed* style, "out in ~42m" replaces the reset time
 when that's the more urgent news.
 
+## Requirements
+
+Klaudometer is a **KDE Plasma 6** widget. It runs on any distro with Plasma 6. It doesn't run on
+GNOME, Cinnamon, XFCE or other desktops, or on Plasma 5.
+
+| Distro | Plasma | Status |
+|---|---|---|
+| Fedora 44 KDE | 6.7 | Developed and run here |
+| Kubuntu / Ubuntu 26.04 LTS | 6.6 | Everything needed comes with `kubuntu-desktop` |
+| Debian 13 (trixie) | 6.3 | Everything needed comes with `kde-plasma-desktop` |
+| Arch Linux, Manjaro, EndeavourOS | 6.8 | Everything needed comes with `plasma-desktop` |
+| openSUSE Tumbleweed | 6.8 | Everything needed comes with the `kde_plasma` pattern |
+| Kubuntu 24.04 LTS, Debian 12 | 5.27 | **Not supported** (Plasma 5) |
+
+The widget itself has only been run on Fedora. For the other distros, I checked that each
+standard Plasma install includes every package the widget needs, and ran the helper under that
+distro's own Python (3.13 to 3.14).
+
+`secret-tool` is the one thing no standard install includes. You only need it to keep the Admin
+API key for [API spend](#claude-api-spend) in your wallet.
+
+On a minimal install, `./install.sh --check` lists anything missing along with the command to
+install it. The full set for each distro:
+
+**Debian / Ubuntu**
+
+```bash
+sudo apt install python3 qml6-module-org-kde-plasma-plasma5support qml6-module-qtquick-shapes qml6-module-org-kde-kcmutils qml6-module-org-kde-kquickcontrols qml6-module-org-kde-notifications libsecret-tools
+```
+
+**Fedora**
+
+```bash
+sudo dnf install python3 plasma5support qt6-qtdeclarative kf6-kcmutils kf6-kdeclarative kf6-knotifications libsecret
+```
+
+**Arch**
+
+```bash
+sudo pacman -S python plasma5support qt6-declarative kcmutils kdeclarative knotifications libsecret
+```
+
+**openSUSE**
+
+```bash
+sudo zypper install python3 plasma5support6 qt6-declarative-imports kf6-kcmutils-imports kf6-kdeclarative-imports kf6-knotifications-imports secret-tool
+```
+
+The notifications package and `secret-tool` are optional. Without the first, alerts are off.
+Without the second, the Admin API key can go in a private file instead (see API spend).
+Everything else works either way.
+
 ## Install / update
 
 ```bash
 ./install.sh
 ```
 
-Then right-click the desktop or panel, choose **Add or Manage Widgets**, and pick **Klaudometer**.
+The installer checks for Plasma 6 and the packages above first, then installs the widget for
+your user. It uses `kpackagetool6` if it's there, or copies the widget into
+`~/.local/share/plasma/plasmoids/` if not. Then right-click the desktop or panel, choose
+**Add or Manage Widgets**, and pick **Klaudometer**.
+
 Each panel and desktop gets its own copy with its own settings. After an update, run
 `systemctl --user restart plasma-plasmashell` so widgets already placed pick up the new code.
 
-Uninstall: `kpackagetool6 -t Plasma/Applet -r io.github.ajacks-595.klaudometer`
+Uninstall: `kpackagetool6 -t Plasma/Applet -r io.github.ajacks-595.klaudometer`, or delete
+`~/.local/share/plasma/plasmoids/io.github.ajacks-595.klaudometer`.
 
 ## Settings
 
@@ -84,6 +141,10 @@ secret-tool store --label='Klaudometer Admin API key' service klaudometer key ad
 Paste the key when it asks for a password. Klaudometer reads the key from the wallet each time it checks,
 and never writes it to a file. The console has no API for its spend limit, so the budget is the one you
 set in the widget.
+
+If your system has no wallet service, put the key on its own in `~/.config/klaudometer/admin-key` and
+make the file private with `chmod 600 ~/.config/klaudometer/admin-key`. Klaudometer refuses a key file
+that other users can read.
 
 ## How it gets the numbers
 

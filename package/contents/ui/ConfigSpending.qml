@@ -87,7 +87,9 @@ KCM.SimpleKCM {
                 wrapMode: Text.WordWrap
                 text: page.keyStatus === null ? i18n("Checking…")
                     : page.keyStatus.found
-                    ? (page.keyStatus.source === "wallet" ? i18n("Found in your wallet") : i18n("Found in $ANTHROPIC_ADMIN_KEY"))
+                    ? (page.keyStatus.source === "wallet" ? i18n("Found in your wallet")
+                        : page.keyStatus.source === "file" ? i18n("Found in ~/.config/klaudometer/admin-key")
+                        : i18n("Found in $ANTHROPIC_ADMIN_KEY"))
                     : page.keyStatus.error
             }
 
@@ -126,6 +128,14 @@ KCM.SimpleKCM {
                     commandField.deselect();
                 }
             }
+        }
+
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 24
+            text: i18n("secret-tool comes from libsecret-tools on Debian and Ubuntu, secret-tool on openSUSE, and libsecret on Fedora and Arch. With no wallet service at all, put the key alone in ~/.config/klaudometer/admin-key and run chmod 600 on it.")
+            wrapMode: Text.WordWrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
         }
 
         Kirigami.UrlButton {
