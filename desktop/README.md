@@ -14,7 +14,7 @@ It runs on Linux too. There the [Plasma widget](../README.md#plasma-widget) and 
 | `core/` | `klaudometer-core`: all the logic, with no GUI. It fetches usage and API spend, reads credentials, and handles the shared cache, alert claims, meters, pace and formatting. |
 | `src-tauri/` | The app: tray or menu bar icon, menu, card window, notifications, and a background refresh thread. |
 | `ui/` | The card window: plain HTML, CSS and JS, with no build step. |
-| `src-tauri/icons/` | App icons, generated from `app-icon.svg`. |
+| `src-tauri/icons/` | App icons. Regenerate them with `python3 scripts/make_icons.py src-tauri/icons` (needs ImageMagick). Tauri only loads 8-bit RGBA PNGs, and `--check` verifies that. |
 
 The core is a port of the Linux helper (`package/contents/code/fetch_usage.py`) and the tray icon's
 logic. It uses the same endpoints and the same cache and alert files, so on Linux all of Klaudometer's
