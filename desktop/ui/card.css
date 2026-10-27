@@ -1,0 +1,174 @@
+:root {
+  --bg: #1f2226;
+  --fg: #eceff1;
+  --muted: rgba(236, 239, 241, 0.6);
+  --track: rgba(236, 239, 241, 0.13);
+  --chip: rgba(236, 239, 241, 0.1);
+  --border: rgba(255, 255, 255, 0.08);
+  --warning: #e8a33d;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fbfbfc;
+    --fg: #1f2226;
+    --muted: rgba(31, 34, 38, 0.6);
+    --track: rgba(31, 34, 38, 0.12);
+    --chip: rgba(31, 34, 38, 0.07);
+    --border: rgba(0, 0, 0, 0.1);
+    --warning: #b8740f;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.35 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--border);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.plan {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--chip);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+header button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+header button:hover {
+  background: var(--chip);
+  color: var(--fg);
+}
+
+.meters {
+  flex: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+  align-items: start;
+  padding-top: 14px;
+}
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+
+.meter.stale svg {
+  opacity: 0.5;
+}
+
+.ring {
+  position: relative;
+}
+
+.ring .value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring .big {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ring .sub {
+  color: var(--muted);
+}
+
+.title {
+  margin-top: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.title .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+
+.caption {
+  margin-top: 2px;
+}
+
+.small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.small.warn {
+  color: var(--warning);
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+footer .error {
+  color: var(--warning);
+}
+
+footer .links a {
+  margin-left: 10px;
+  color: var(--muted);
+}
+
+footer .links a:hover {
+  color: var(--fg);
+}

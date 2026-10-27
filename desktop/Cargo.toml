@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["core", "src-tauri"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+license = "MIT"
+authors = ["Alex Jackson"]
+repository = "https://github.com/ajacks-595/klaudometer"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+# Exact float parsing, so timestamps read back from the cache match what was written.
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[profile.release]
+# A tray app is small and long-running: favour size, keep it fast enough.
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

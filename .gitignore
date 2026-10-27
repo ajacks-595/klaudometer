@@ -12,3 +12,7 @@ __pycache__/
 
 # Release builds
 dist/
+
+# Desktop app build output
+desktop/target/
+desktop/src-tauri/gen/

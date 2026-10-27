@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Klaudometer",
+  "version": "1.0.0",
+  "identifier": "io.github.ajacks-595.klaudometer",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "card",
+        "title": "Klaudometer",
+        "url": "index.html",
+        "width": 420,
+        "height": 330,
+        "visible": false,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Claude usage in your menu bar or system tray",
+    "longDescription": "Klaudometer shows how much of your Claude subscription's 5-hour and 7-day limits you've used, plus extra usage and Claude API spend. Unofficial; not affiliated with Anthropic.",
+    "copyright": "© 2026 Alex Jackson. MIT License.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the card window may do: listen for usage updates and be dragged by its header. Klaudometer's own commands are allowed by default.",
+  "windows": [
+    "card"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging"
+  ]
+}
