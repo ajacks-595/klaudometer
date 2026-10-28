@@ -3,12 +3,17 @@
 Shows how much of your Claude subscription's **5-hour** and **7-day** limits you've used.
 It can also show your subscription's **extra usage** and your **Claude API spend** for the month.
 
-It comes in three forms:
+| On | Klaudometer is | Get it |
+|---|---|---|
+| macOS 11 or later | a [menu bar app](#macos-and-windows) | the `.dmg` from [Releases][releases] |
+| Windows 10 or 11 | a [system tray app](#macos-and-windows) | the `.exe` or `.msi` from [Releases][releases] |
+| KDE Plasma 6 | a [desktop and panel widget](#plasma-widget) | the `.plasmoid` from [Releases][releases], or `./install.sh` |
+| GNOME, XFCE, Cinnamon, MATE, Budgie, LXQt or Plasma 5 | a [tray icon](#tray-icon-gnome-xfce-cinnamon-and-others) | `tray/install.sh` from the source |
 
-- **A KDE Plasma 6 widget** for the desktop and panel. That's most of this README.
-- **A [tray icon](#tray-icon-gnome-xfce-cinnamon-and-others)** for GNOME, XFCE, Cinnamon, MATE,
-  Budgie, LXQt and Plasma 5.
-- **An [app for macOS and Windows](#macos-and-windows)** in the menu bar or system tray.
+The subscription meters use Claude Code's login on the same computer, so install Claude Code and log
+in first.
+
+[releases]: https://github.com/ajacks-595/klaudometer/releases
 
 > **Unofficial.** Klaudometer isn't made by, affiliated with or endorsed by Anthropic. Read the
 > [disclaimer](#disclaimer) before using it.
@@ -16,25 +21,34 @@ It comes in three forms:
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/desktop-card.png" alt="The desktop card: segmented 5-hour and 7-day rings and an API spend ring, each with how much is left, reset time and pace" width="600">
+  <img src="docs/screenshots/desktop-card.png" alt="The Plasma widget's desktop card: segmented 5-hour and 7-day rings and an API spend ring, each with how much is left, reset time and pace" width="600">
+  <br><sub>The KDE Plasma widget on the desktop…</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/panel-standard.png" alt="Panel, Standard style: coloured 5h and 7d labels beside two small rings" height="44">
   &nbsp;&nbsp;
   <img src="docs/screenshots/panel-detailed.png" alt="Panel, Detailed style: rings with labels and reset countdowns" height="44">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/settings-appearance.png" alt="Appearance settings: theme with colour preview, panel style and ring options" width="420">
-  &nbsp;
-  <img src="docs/screenshots/tray-menu-gnome.png" alt="The tray icon's menu on GNOME, with usage, reset times, pace and API spend" width="420">
+  <br><sub>…and in a panel, in the Standard and Detailed styles</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/macos-menu-bar.png" alt="The macOS menu bar: two small rings and the label 5h 81% · 7d 47%" height="30">
   <br>
   <img src="docs/screenshots/macos-card.png" alt="The macOS app's card: segmented 5-hour and 7-day rings, extra usage and API spend, each with how much is left, reset time and pace" width="506">
+  <br><sub>The macOS menu bar app and its card</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/windows-settings.png" alt="The settings window on Windows, on its Spending page: API spend turned on, a $100 budget, and the Admin API key saved in Windows Credential Manager" height="400">
+  &nbsp;
+  <img src="docs/screenshots/tray-menu-gnome.png" alt="The Linux tray icon's menu on GNOME, with usage, reset times, pace and API spend" height="400">
+  <br><sub>Settings on Windows, and the Linux tray icon's menu on GNOME</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/settings-appearance.png" alt="The Plasma widget's Appearance settings: theme with colour preview, panel style and ring options" width="380">
+  <br><sub>The Plasma widget's Appearance settings</sub>
 </p>
 
 All screenshots use made-up numbers.
@@ -60,14 +74,14 @@ before it resets. It appears once a tenth of the window (or month) has passed, s
 guesses aren't noise. In the panel's *Detailed* style, "out in ~42m" replaces the reset time
 when that's the more urgent news.
 
-## Requirements
+### Requirements
 
 The widget runs on any distro with **KDE Plasma 6**. On other desktops, or on Plasma 5, use the
 [tray icon](#tray-icon-gnome-xfce-cinnamon-and-others) instead.
 
 | Distro | Plasma | Status |
 |---|---|---|
-| Fedora 44 KDE | 6.7 | Developed and run here |
+| Fedora 44 KDE | 6.7 | Developed and used daily |
 | Kubuntu / Ubuntu 26.04 LTS | 6.6 | Everything needed comes with `kubuntu-desktop` |
 | Debian 13 (trixie) | 6.3 | Everything needed comes with `kde-plasma-desktop` |
 | Arch Linux, Manjaro, EndeavourOS | 6.8 | Everything needed comes with `plasma-desktop` |
@@ -114,7 +128,7 @@ The notifications package and `secret-tool` are optional. Without the first, ale
 Without the second, the Admin API key can go in a private file instead (see API spend).
 Everything else works either way.
 
-## Install / update
+### Install / update
 
 ```bash
 ./install.sh
@@ -125,7 +139,7 @@ your user. It uses `kpackagetool6` if it's there, or copies the widget into
 `~/.local/share/plasma/plasmoids/` if not. Then right-click the desktop or panel, choose
 **Add or Manage Widgets**, and pick **Klaudometer**.
 
-**From a release:** download `klaudometer-<version>.plasmoid` from the Releases page. Then right-click
+**From a release:** download `klaudometer-<version>.plasmoid` from [Releases][releases]. Then right-click
 the desktop and choose **Add or Manage Widgets › Get New › Install Widget From Local File…**, or run
 `kpackagetool6 -t Plasma/Applet -i klaudometer-<version>.plasmoid`. This skips the installer's
 dependency check, so if the widget won't load, run `./install.sh --check` from a source copy.
@@ -138,7 +152,7 @@ To build the `.plasmoid` yourself, run `./build.sh`; it writes `dist/klaudometer
 Uninstall: `kpackagetool6 -t Plasma/Applet -r io.github.ajacks-595.klaudometer`, or delete
 `~/.local/share/plasma/plasmoids/io.github.ajacks-595.klaudometer`.
 
-## Settings
+### Settings
 
 Right-click the widget and choose **Configure Klaudometer…**
 
@@ -171,27 +185,6 @@ Right-click the widget and choose **Configure Klaudometer…**
 - Each alert is sent once per window or month, even with the widget on several panels. The copies share a
   record in `~/.cache/klaudometer/notified.json`, so a restart or re-login doesn't repeat alerts.
   Changing a level counts as a new alert.
-
-## Claude API spend
-
-API spend comes from your Console organization's
-[cost report](https://platform.claude.com/docs/en/manage-claude/usage-cost-api), which updates within
-a few minutes. It needs an **Admin API key** (`sk-ant-admin01-…`). Individual Console accounts can't
-create one; set up an organization first. Create the key at
-[platform.claude.com/settings/admin-keys](https://platform.claude.com/settings/admin-keys), then store it
-in your wallet (KDE Wallet or GNOME Keyring):
-
-```bash
-secret-tool store --label='Klaudometer Admin API key' service klaudometer key admin
-```
-
-Paste the key when it asks for a password. Klaudometer reads the key from the wallet each time it checks,
-and never writes it to a file. The console has no API for its spend limit, so the budget is the one you
-set in the widget.
-
-If your system has no wallet service, put the key on its own in `~/.config/klaudometer/admin-key` and
-make the file private with `chmod 600 ~/.config/klaudometer/admin-key`. Klaudometer refuses a key file
-that other users can read.
 
 ## Tray icon (GNOME, XFCE, Cinnamon and others)
 
@@ -255,16 +248,15 @@ On a Mac, Klaudometer sits in the menu bar. On Windows, it sits in the system tr
   widget's desktop card.
 - **Menu:** right-click the icon for each meter's details, Refresh Now, Claude's usage page,
   Settings and Quit.
-- **Settings:** which meters to show, used or left, themes, colours and levels, notifications, and
-  start at login. The Spending page saves your Admin API key in the Keychain or Windows Credential
-  Manager.
+- **Settings:** which meters to show, used or left, themes, colours and levels, notifications,
+  start at login, and [API spend](#claude-api-spend).
 - **Notifications** at the warning and critical levels, when you're on pace to run out, and when a
   window resets, as on Linux.
 
 ### Install
 
-Klaudometer reads the login of Claude Code on the same computer, so install Claude Code and log in
-first. Then download from the [Releases page](https://github.com/ajacks-595/klaudometer/releases):
+Klaudometer uses Claude Code's login on the same computer, so install Claude Code and log in first.
+Then download it from [Releases][releases]:
 
 - **macOS 11 or later** (Apple silicon or Intel): `Klaudometer_<version>_universal.dmg`. Open it
   and drag Klaudometer into Applications.
@@ -285,10 +277,35 @@ To uninstall, choose **Quit Klaudometer** from its menu. Then on a Mac, drag it 
 to the Trash. On Windows, remove it in **Settings › Apps**. Where it keeps its settings and cache is
 listed in [desktop/README.md](desktop/README.md#where-things-live), along with how to build it.
 
+## Claude API spend
+
+Every version of Klaudometer can also show this month's Claude API spend against a budget you set.
+It comes from your Console organization's
+[cost report](https://platform.claude.com/docs/en/manage-claude/usage-cost-api), which updates within
+a few minutes, and needs an **Admin API key** (`sk-ant-admin01-…`). Individual Console accounts can't
+create one, so set up an organization first. Create the key at
+[platform.claude.com/settings/admin-keys](https://platform.claude.com/settings/admin-keys), then:
+
+- **macOS and Windows:** paste it into **Settings › Spending**. It's saved in the Keychain or Windows
+  Credential Manager.
+- **Linux:** store it in your wallet (KDE Wallet or GNOME Keyring) with this command, pasting the key
+  when it asks for a password:
+
+  ```bash
+  secret-tool store --label='Klaudometer Admin API key' service klaudometer key admin
+  ```
+
+  If your system has no wallet service, put the key on its own in `~/.config/klaudometer/admin-key`
+  and make the file private with `chmod 600 ~/.config/klaudometer/admin-key`. Klaudometer refuses a
+  key file that other users can read.
+
+Klaudometer reads the key each time it checks and only ever sends it to `api.anthropic.com`. The
+Console has no API for its spend limit, so the budget is the one you set in Klaudometer.
+
 ## How it gets the numbers
 
-`package/contents/code/fetch_usage.py` does all the fetching for both the widget and the tray icon.
-It only talks to `api.anthropic.com`, and there's no telemetry.
+On Linux, `package/contents/code/fetch_usage.py` does all the fetching for both the widget and the
+tray icon. It only talks to `api.anthropic.com`, and there's no telemetry.
 
 - **Subscription limits and extra usage:** it reads the login Claude Code stores in
   `~/.claude/.credentials.json` and calls `https://api.anthropic.com/api/oauth/usage`, the same
