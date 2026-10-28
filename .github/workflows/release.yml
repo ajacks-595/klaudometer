@@ -1,0 +1,73 @@
+# Builds every Klaudometer download and keeps a draft GitHub release for the
+# current version up to date: the macOS .dmg and the Windows .msi and .exe
+# (built and smoke-tested by the Desktop app workflow), the Plasma widget's
+# .plasmoid, and their SHA-256 checksums.
+#
+# It never publishes. To release, check the draft on GitHub and publish it,
+# which creates the tag. After that, pushes leave that release alone until
+# the version is bumped (see .github/scripts/check_versions.py).
+name: Release
+
+on:
+  push:
+    branches: [main, feature/desktop-app]
+    paths:
+      - "desktop/**"
+      - "package/**"
+      - "tray/**"
+      - "build.sh"
+      - "docs/release-notes/**"
+      - ".github/workflows/**"
+      - ".github/scripts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    name: Check the version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: python3 .github/scripts/check_versions.py --release >> "$GITHUB_OUTPUT"
+
+  desktop:
+    name: Desktop app
+    needs: version
+    uses: ./.github/workflows/desktop.yml
+
+  plasmoid:
+    name: Plasma widget
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: klaudometer-plasmoid
+          path: dist/*.plasmoid
+
+  draft:
+    name: Update the draft release
+    needs: [version, desktop, plasmoid]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: klaudometer-*
+          path: downloads
+      - run: bash .github/scripts/draft_release.sh "${{ needs.version.outputs.version }}" downloads
+        env:
+          GH_TOKEN: ${{ github.token }}

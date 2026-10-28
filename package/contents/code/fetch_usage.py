@@ -41,7 +41,7 @@ from datetime import datetime, timedelta, timezone
 API_BASE = (os.environ.get("KLAUDOMETER_API_BASE") or "https://api.anthropic.com").rstrip("/")
 USAGE_URL = API_BASE + "/api/oauth/usage"
 COST_URL = API_BASE + "/v1/organizations/cost_report"
-USER_AGENT = "klaudometer/1.0.0"
+USER_AGENT = "klaudometer/1.1.0"
 CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 CREDS_PATH = os.path.join(CONFIG_DIR, ".credentials.json")
 CACHE_DIR = os.path.join(

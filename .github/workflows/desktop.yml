@@ -1,15 +1,16 @@
 # Builds the desktop app for macOS (.dmg) and Windows (.msi and .exe
 # installers), and smoke-tests each build on a real Mac and Windows machine
 # against a mock of Anthropic's API. Builds are unsigned for now.
+#
+# Pushes run it through the Release workflow, which then updates the draft
+# release; pull requests run it on its own.
 name: Desktop app
 
 on:
-  push:
-    branches: [main, feature/desktop-app]
-    paths: ["desktop/**", ".github/workflows/desktop.yml", ".github/scripts/**"]
   pull_request:
     paths: ["desktop/**", ".github/workflows/desktop.yml", ".github/scripts/**"]
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -24,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check every version number matches
+        run: python3 .github/scripts/check_versions.py
       - name: Check the app icons are 8-bit RGBA
         # A 16-bit icon makes the macOS app abort at startup.
         run: python3 desktop/scripts/make_icons.py --check desktop/src-tauri/icons

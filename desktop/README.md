@@ -5,7 +5,8 @@ tray: an icon drawn from the usage rings, a menu with the details, a card window
 It runs on Linux too. There the [Plasma widget](../README.md#plasma-widget) and the
 [tray icon](../README.md#tray-icon-gnome-xfce-cinnamon-and-others) remain the main options.
 
-**Status: in development.** It isn't released yet.
+**Status:** first released in 1.1.0. Install it from the [Releases page](https://github.com/ajacks-595/klaudometer/releases),
+as the [main README](../README.md#macos-and-windows) explains.
 
 ## Layout
 
@@ -60,9 +61,9 @@ login is read from, and `$KLAUDOMETER_API_BASE` points everything at another ser
 ## Builds
 
 The [Desktop app workflow](../.github/workflows/desktop.yml) builds a universal macOS `.dmg` and
-Windows `.msi` and `.exe` installers on every push. Each build is smoke-tested on a real Mac and
-Windows machine against a mock of Anthropic's API (`.github/scripts/`), and the screenshots it takes
-are uploaded with the installers.
+Windows `.msi` and `.exe` installers. Each build is smoke-tested on a real Mac and Windows machine
+against a mock of Anthropic's API (`.github/scripts/`), and the screenshots it takes are uploaded
+with the installers. It runs on pull requests, and on pushes through the Release workflow.
 
 The builds aren't signed yet, so:
 
@@ -90,3 +91,19 @@ cargo run -p klaudometer        # run the app
 
 Running the app a second time opens the first copy's card. On Linux the tray icon only opens its
 menu, so use **Show Card** there.
+
+## Releasing
+
+Klaudometer has one version number for everything, and the [Release
+workflow](../.github/workflows/release.yml) keeps a draft GitHub release for it up to date.
+
+1. Bump the version in `desktop/Cargo.toml`, `desktop/src-tauri/tauri.conf.json`,
+   `package/metadata.json` and the `USER_AGENT` in `package/contents/code/fetch_usage.py`.
+   `python3 .github/scripts/check_versions.py` checks they match, and CI runs it too.
+2. Write the release notes in `docs/release-notes/v<version>.md`.
+3. Push to main. The workflow builds and smoke-tests the app, builds the `.plasmoid`, and creates
+   or updates the draft release `v<version>` with every download and `SHA256SUMS.txt`.
+4. Check the draft on GitHub and publish it. Publishing creates the tag.
+
+The workflow never publishes. Once a version is published, later pushes leave it alone until the
+version is bumped.

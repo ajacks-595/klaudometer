@@ -3,11 +3,12 @@
 Shows how much of your Claude subscription's **5-hour** and **7-day** limits you've used.
 It can also show your subscription's **extra usage** and your **Claude API spend** for the month.
 
-It comes in two forms:
+It comes in three forms:
 
 - **A KDE Plasma 6 widget** for the desktop and panel. That's most of this README.
 - **A [tray icon](#tray-icon-gnome-xfce-cinnamon-and-others)** for GNOME, XFCE, Cinnamon, MATE,
   Budgie, LXQt and Plasma 5.
+- **An [app for macOS and Windows](#macos-and-windows)** in the menu bar or system tray.
 
 > **Unofficial.** Klaudometer isn't made by, affiliated with or endorsed by Anthropic. Read the
 > [disclaimer](#disclaimer) before using it.
@@ -28,6 +29,12 @@ It comes in two forms:
   <img src="docs/screenshots/settings-appearance.png" alt="Appearance settings: theme with colour preview, panel style and ring options" width="420">
   &nbsp;
   <img src="docs/screenshots/tray-menu-gnome.png" alt="The tray icon's menu on GNOME, with usage, reset times, pace and API spend" width="420">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/macos-menu-bar.png" alt="The macOS menu bar: two small rings and the label 5h 81% · 7d 47%" height="30">
+  <br>
+  <img src="docs/screenshots/macos-card.png" alt="The macOS app's card: segmented 5-hour and 7-day rings, extra usage and API spend, each with how much is left, reset time and pace" width="506">
 </p>
 
 All screenshots use made-up numbers.
@@ -238,6 +245,46 @@ levels, pace, and notifications. Changes apply within about 20 seconds.
 `python3 tray/klaudometer_tray.py --print` prints the current status once, without a tray, which
 is handy for scripts or a terminal.
 
+## macOS and Windows
+
+On a Mac, Klaudometer sits in the menu bar. On Windows, it sits in the system tray.
+
+- **Icon:** the same two rings as the Linux tray icon. On a Mac the percentages appear beside it,
+  for example `5h 81% · 7d 47%`.
+- **Card:** click the icon for the rings, how much is left, reset times and pace, as on the
+  widget's desktop card.
+- **Menu:** right-click the icon for each meter's details, Refresh Now, Claude's usage page,
+  Settings and Quit.
+- **Settings:** which meters to show, used or left, themes, colours and levels, notifications, and
+  start at login. The Spending page saves your Admin API key in the Keychain or Windows Credential
+  Manager.
+- **Notifications** at the warning and critical levels, when you're on pace to run out, and when a
+  window resets, as on Linux.
+
+### Install
+
+Klaudometer reads the login of Claude Code on the same computer, so install Claude Code and log in
+first. Then download from the [Releases page](https://github.com/ajacks-595/klaudometer/releases):
+
+- **macOS 11 or later** (Apple silicon or Intel): `Klaudometer_<version>_universal.dmg`. Open it
+  and drag Klaudometer into Applications.
+- **Windows 10 or 11:** `Klaudometer_<version>_x64-setup.exe` installs just for you, without
+  administrator rights. `Klaudometer_<version>_x64_en-US.msi` installs for everyone on the PC.
+
+The builds aren't signed yet, so the first launch takes one extra step:
+
+- **macOS** says Klaudometer can't be opened. Go to **System Settings › Privacy & Security** and
+  choose **Open Anyway**.
+- **Windows** SmartScreen may warn about an unknown publisher. Choose **More info › Run anyway**.
+  Windows 11 puts new tray icons behind the **^** by the clock, so drag Klaudometer's icon onto the
+  taskbar to keep it in view.
+
+To start Klaudometer when you log in, tick **Start at login** in its settings.
+
+To uninstall, choose **Quit Klaudometer** from its menu. Then on a Mac, drag it from Applications
+to the Trash. On Windows, remove it in **Settings › Apps**. Where it keeps its settings and cache is
+listed in [desktop/README.md](desktop/README.md#where-things-live), along with how to build it.
+
 ## How it gets the numbers
 
 `package/contents/code/fetch_usage.py` does all the fetching for both the widget and the tray icon.
@@ -255,6 +302,9 @@ It only talks to `api.anthropic.com`, and there's no telemetry.
 - You can run it by hand: `python3 package/contents/code/fetch_usage.py --sources sub,api`.
   For testing, `KLAUDOMETER_API_BASE` points it at another server, and `ANTHROPIC_ADMIN_KEY`
   overrides the wallet.
+- The macOS and Windows app does the same in Rust (`desktop/core`). On a Mac it reads Claude Code's
+  login from the Keychain, where Claude Code keeps it. On Linux it shares the widget's cache and alert
+  record, so each alert is sent only once whichever front ends you run.
 
 ## Known limitations
 
@@ -268,6 +318,9 @@ It only talks to `api.anthropic.com`, and there's no telemetry.
 - **Not shown yet:** per-model weekly limits (Opus, Sonnet) on Max plans.
 - **Notifications** from the Plasma widget name "Plasma" as the sender.
 - **Tray labels:** KDE and XFCE show only the tray icon, not the text label next to it.
+- **macOS and Windows app:** it has been tested on GitHub's Mac and Windows build machines, against a
+  stand-in for Anthropic's API. It hasn't yet been tried with a real account on a real Mac or PC.
+  The builds aren't signed, so macOS and Windows warn the first time it runs.
 
 ## Disclaimer
 
