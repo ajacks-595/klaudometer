@@ -20,6 +20,26 @@ The core is a port of the Linux helper (`package/contents/code/fetch_usage.py`) 
 logic. It uses the same endpoints and the same cache and alert files, so on Linux all of Klaudometer's
 front ends share one cache, and an alert is only sent once.
 
+## Settings
+
+**Settings…** in the tray menu, or the link on the card, opens the settings window. Changes are
+saved as you make them, and the icon and card update straight away.
+
+| Page | What's on it |
+|---|---|
+| General | Which meters to show, used or left, pace, the text beside the icon (macOS and Linux), how often to check, and start at login. |
+| Appearance | Theme, single colour overrides, and the warning and critical levels. |
+| Spending | Claude API spend, the monthly budget, and saving or removing the Admin API key. |
+| Notifications | Which alerts to send, and a test notification. |
+
+A pasted Admin API key goes straight into the Keychain, Credential Manager or (on Linux) your wallet
+through `secret-tool`. On Linux without a wallet, it goes into a key file only you can read. The
+window only ever learns where the key is, never the key itself.
+
+`klaudometer --settings` opens the settings window, and `--settings=spending` (or `general`,
+`appearance`, `notifications`) opens it on that page. If Klaudometer is already running, the running
+copy opens it.
+
 ## Where things live
 
 | | macOS | Windows | Linux |

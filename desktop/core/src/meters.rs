@@ -20,6 +20,10 @@ pub struct Colors {
     pub critical: String,
 }
 
+/// Theme IDs and names, in the order the settings window lists them.
+pub const THEMES: [(&str, &str); 5] =
+    [("claude", "Claude"), ("ocean", "Ocean"), ("sunset", "Sunset"), ("forest", "Forest"), ("mono", "Monochrome")];
+
 /// The theme's colours, with any single-colour overrides from the settings.
 pub fn palette(settings: &Settings) -> Colors {
     let [five_hour, seven_day, spend, warning, critical] = match settings.theme.as_str() {

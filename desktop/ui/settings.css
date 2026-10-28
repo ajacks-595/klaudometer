@@ -1,0 +1,315 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* Tabs, like a preferences toolbar. */
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs button {
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tabs button:hover {
+  color: var(--fg);
+}
+
+.tabs button[aria-selected="true"] {
+  background: var(--chip);
+  color: var(--fg);
+}
+
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 28px 22px 16px;
+}
+
+/* A form layout: labels right-aligned beside their controls. */
+.row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 16px;
+  padding: 5px 0;
+}
+
+.label {
+  text-align: right;
+  line-height: 26px;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.control > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+
+.control.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+input[type="number"],
+input[type="password"],
+select {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field);
+}
+
+input[type="number"] {
+  width: 72px;
+}
+
+input[type="number"].wide {
+  width: 100px;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input:disabled,
+select:disabled,
+label:has(input:disabled) {
+  opacity: 0.5;
+}
+
+.hint {
+  max-width: 400px;
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: text;
+}
+
+.hint:empty {
+  display: none;
+}
+
+.error {
+  color: var(--warning);
+}
+
+.separator {
+  height: 1px;
+  margin: 12px 0 12px 166px;
+  background: var(--border);
+}
+
+.button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:hover {
+  border-color: var(--muted);
+}
+
+.button.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.button.primary:hover {
+  filter: brightness(1.08);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Theme picker: a small pair of rings per theme. */
+.themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.theme {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 82px;
+  padding: 10px 4px 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: var(--field);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.theme input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.theme:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Single colour overrides. */
+.colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 16px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.color input {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--field-border);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+
+.color button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Admin API key. */
+.status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+}
+
+.status .icon {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.status.found .icon {
+  background: var(--ok);
+}
+
+.status.problem .icon {
+  background: var(--warning);
+}
+
+.key-form {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 4px;
+}
+
+.key-form input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Noto Sans Mono", monospace;
+  user-select: text;
+}
+
+.key-form + .hint {
+  margin-top: 4px;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+footer .error {
+  color: var(--warning);
+}

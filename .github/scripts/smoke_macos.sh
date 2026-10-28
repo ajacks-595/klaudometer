@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Smoke-test the macOS build on a CI runner. Gives it a fake Claude Code login
-# in the Keychain (where Claude Code keeps it on a Mac), points it at the mock
-# API, checks it fetched and cached usage and API spend, and takes
-# screenshots of the menu bar and the card.
+# and Admin API key in the Keychain (where each is kept on a Mac), points it at
+# the mock API, checks it fetched and cached usage and API spend, and takes
+# screenshots of the menu bar, the card and the settings window.
 #
 #   smoke_macos.sh path/to/Klaudometer.app output-dir
 set -euo pipefail
@@ -23,6 +23,8 @@ trap 'kill "$mock" 2>/dev/null || true; [ -n "$name" ] && pkill -x "$name" 2>/de
 expires=$(( ($(date +%s) + 86400) * 1000 ))
 login='{"claudeAiOauth":{"accessToken":"fake-oauth-token","expiresAt":'"$expires"',"subscriptionType":"max","rateLimitTier":"default_claude_max_5x"}}'
 security add-generic-password -U -A -a "$USER" -s "Claude Code-credentials" -w "$login"
+# Where Klaudometer's settings window saves the Admin API key.
+security add-generic-password -U -A -a admin -s klaudometer -w "sk-ant-admin01-fake"
 
 # Show API spend as well, with the full tray label.
 settings="$HOME/Library/Application Support/klaudometer"
@@ -32,8 +34,8 @@ echo '{"show_api": true, "label": "full"}' > "$settings/desktop.json"
 binary="$(find "$app/Contents/MacOS" -type f -perm -u+x | head -1)"
 name="$(basename "$binary")"
 echo "Launching $binary"
-KLAUDOMETER_API_BASE="http://127.0.0.1:$port" ANTHROPIC_ADMIN_KEY="sk-ant-admin01-fake" \
-    "$binary" > "$out/app.log" 2>&1 &
+export KLAUDOMETER_API_BASE="http://127.0.0.1:$port"
+"$binary" > "$out/app.log" 2>&1 &
 
 cache="$HOME/Library/Caches/klaudometer"
 for _ in $(seq 1 60); do
@@ -52,7 +54,7 @@ assert usage["plan"] == "Max 5x", usage
 assert usage["windows"]["five_hour"]["used"] == 81.0, usage
 assert usage["extra"]["used"] == 12.34, usage
 assert api["error"] is None and abs(api["spent"] - 42.75) < 1e-9, api
-print("OK: login read from the Keychain; usage and API spend fetched and cached")
+print("OK: login and Admin key read from the Keychain; usage and API spend fetched and cached")
 EOF
 
 if ! pgrep -x "$name" > /dev/null; then
@@ -68,3 +70,7 @@ screencapture -x "$out/menu-bar.png" || echo "screencapture failed (no screen ac
 "$binary" || true
 sleep 3
 screencapture -x "$out/card.png" || true
+# And with --settings, the settings window.
+"$binary" --settings=spending || true
+sleep 4
+screencapture -x "$out/settings.png" || true

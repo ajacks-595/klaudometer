@@ -69,11 +69,37 @@ impl Default for Settings {
 impl Settings {
     /// Settings from `path`, or the defaults if it's missing or unreadable.
     pub fn load(path: &Path) -> Settings {
-        crate::cache::read_json(path).unwrap_or_default()
+        crate::cache::read_json(path).map(Settings::normalized).unwrap_or_default()
     }
 
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         crate::cache::write_json(path, self)
+    }
+
+    /// The settings with numbers brought into range and anything unknown set
+    /// back to its default, for saving what the settings window sends.
+    pub fn normalized(self) -> Settings {
+        let d = Settings::default();
+        let color = |c: String| {
+            let hex = c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|ch| ch.is_ascii_hexdigit());
+            if hex { c.to_uppercase() } else { String::new() }
+        };
+        let level = |v: f64, default: f64| if v.is_finite() { v.round().clamp(1.0, 100.0) } else { default };
+        let warning = level(self.warning, d.warning);
+        Settings {
+            refresh_minutes: self.refresh_minutes.clamp(1, 60),
+            api_budget: if self.api_budget.is_finite() && self.api_budget > 0.0 { self.api_budget } else { d.api_budget },
+            label: if ["full", "compact", "off"].contains(&self.label.as_str()) { self.label } else { d.label },
+            theme: if crate::meters::THEMES.iter().any(|(id, _)| *id == self.theme) { self.theme } else { d.theme },
+            five_hour_color: color(self.five_hour_color),
+            seven_day_color: color(self.seven_day_color),
+            spend_color: color(self.spend_color),
+            warning_color: color(self.warning_color),
+            critical_color: color(self.critical_color),
+            warning,
+            critical: level(self.critical, d.critical).max(warning),
+            ..self
+        }
     }
 
     pub fn refresh_seconds(&self) -> f64 {
@@ -109,6 +135,29 @@ mod tests {
         assert_eq!(s.warning, 60.0);
         assert_eq!(s.critical, 90.0);
         assert_eq!(s.theme, "claude");
+    }
+
+    #[test]
+    fn normalizes_what_the_settings_window_sends() {
+        let s = Settings {
+            refresh_minutes: 0,
+            api_budget: -5.0,
+            label: "huge".into(),
+            theme: "neon".into(),
+            five_hour_color: "#abcdef".into(),
+            seven_day_color: "red".into(),
+            warning: 95.4,
+            critical: 80.0,
+            ..Settings::default()
+        }
+        .normalized();
+        assert_eq!(s.refresh_minutes, 1);
+        assert_eq!(s.api_budget, 100.0);
+        assert_eq!((s.label.as_str(), s.theme.as_str()), ("compact", "claude"));
+        assert_eq!((s.five_hour_color.as_str(), s.seven_day_color.as_str()), ("#ABCDEF", ""));
+        // Critical can't sit below warning.
+        assert_eq!((s.warning, s.critical), (95.0, 95.0));
+        assert_eq!(Settings::default().normalized(), Settings::default());
     }
 
     #[test]

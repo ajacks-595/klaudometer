@@ -62,9 +62,26 @@ function ring(card, size) {
   return svg;
 }
 
+// Wide enough for each meter's title on one line, and for the header.
+function cardWidth(count) {
+  return Math.max(320, 28 + count * 112 + (count - 1) * 10);
+}
+
+// Size the window to the card, telling Rust only when that changes.
+let fitted = "";
+function fit() {
+  const card = document.querySelector(".card");
+  const size = { width: card.offsetWidth, height: card.offsetHeight };
+  if (`${size.width}x${size.height}` !== fitted) {
+    fitted = `${size.width}x${size.height}`;
+    invoke("fit_card", size);
+  }
+}
+
 function render(summary) {
   const meters = document.getElementById("meters");
   const count = Math.max(1, summary.cards.length);
+  document.querySelector(".card").style.width = `${cardWidth(count)}px`;
   const size = Math.min(118, Math.floor((meters.clientWidth - (count - 1) * 10) / count) - 8);
   meters.replaceChildren(
     ...summary.cards.map((card) => {
@@ -94,13 +111,14 @@ function render(summary) {
   const footer = document.getElementById("footer");
   footer.textContent = summary.footer;
   footer.className = summary.errors.length ? "error" : "";
+  fit();
 }
 
 document.getElementById("refresh").addEventListener("click", () => invoke("refresh_now"));
 document.getElementById("close").addEventListener("click", () => invoke("hide_card"));
 document.getElementById("usage-page").addEventListener("click", (e) => {
   e.preventDefault();
-  invoke("open_usage_page");
+  invoke("open_link", { link: "usage" });
 });
 document.getElementById("settings").addEventListener("click", (e) => {
   e.preventDefault();

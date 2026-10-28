@@ -1,7 +1,8 @@
 # Smoke-test the Windows build on a CI runner. Installs the .msi, gives the
-# app a fake Claude Code login in %USERPROFILE%\.claude\.credentials.json,
-# points it at the mock API, checks it fetched and cached usage and API spend,
-# and takes screenshots of the taskbar and the card.
+# app a fake Claude Code login in %USERPROFILE%\.claude\.credentials.json and
+# a fake Admin API key in Credential Manager, points it at the mock API,
+# checks it fetched and cached usage and API spend, and takes screenshots of
+# the taskbar, the card and the settings window.
 #
 #   smoke_windows.ps1 -Msi path\to\Klaudometer.msi -Out output-dir
 param(
@@ -44,8 +45,11 @@ $settings = Join-Path $env:APPDATA "klaudometer"
 New-Item -ItemType Directory -Force $settings | Out-Null
 Set-Content -Path (Join-Path $settings "desktop.json") -Value '{"show_api": true, "label": "full"}' -Encoding ascii
 
+# Where Klaudometer's settings window saves the Admin API key: a generic
+# credential named admin.klaudometer.
+cmdkey /generic:admin.klaudometer /user:admin /pass:sk-ant-admin01-fake | Out-Null
+
 $env:KLAUDOMETER_API_BASE = "http://127.0.0.1:$port"
-$env:ANTHROPIC_ADMIN_KEY = "sk-ant-admin01-fake"
 $app = Start-Process $exe.FullName -PassThru
 
 try {
@@ -62,7 +66,7 @@ try {
         throw "Unexpected usage: $($usage | ConvertTo-Json -Depth 5)"
     }
     if ($api.error -or [math]::Abs($api.spent - 42.75) -gt 1e-9) { throw "Unexpected API spend: $($api | ConvertTo-Json)" }
-    Write-Host "OK: login read from .credentials.json; usage and API spend fetched and cached"
+    Write-Host "OK: login read from .credentials.json and Admin key from Credential Manager; usage and API spend fetched and cached"
 
     if ($app.HasExited) { throw "The app exited with code $($app.ExitCode)" }
     Write-Host "OK: app still running"
@@ -74,6 +78,11 @@ try {
     $second.WaitForExit(15000) | Out-Null
     Start-Sleep -Seconds 3
     Save-Screen "$Out\card.png"
+    # And with --settings, the settings window.
+    $third = Start-Process $exe.FullName -ArgumentList "--settings=spending" -PassThru
+    $third.WaitForExit(15000) | Out-Null
+    Start-Sleep -Seconds 4
+    Save-Screen "$Out\settings.png"
 }
 finally {
     Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue

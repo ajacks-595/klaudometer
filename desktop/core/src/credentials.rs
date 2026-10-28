@@ -1,9 +1,10 @@
-//! Reading Claude Code's login and the Admin API key. Klaudometer only reads
-//! Claude Code's login and never refreshes it itself: refresh tokens rotate,
-//! and racing Claude Code for one could log it out.
+//! Reading Claude Code's login, and reading and storing the Admin API key.
+//! Klaudometer only reads Claude Code's login and never refreshes it itself:
+//! refresh tokens rotate, and racing Claude Code for one could log it out.
 
 use crate::env::Env;
 use crate::fetch::FetchError;
+use serde::Serialize;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -103,6 +104,13 @@ fn find_claude() -> Option<PathBuf> {
 /// Run a program and return its trimmed stdout if it succeeds within
 /// `timeout_secs`. Never shows a console window on Windows.
 pub(crate) fn run_capture(program: &str, args: &[&str], timeout_secs: u64) -> Option<String> {
+    run(program, args, None, timeout_secs).filter(|(ok, out)| *ok && !out.is_empty()).map(|(_, out)| out)
+}
+
+/// Run a program, optionally writing `input` to its stdin, and return whether
+/// it succeeded and its trimmed stdout. None if it can't start or times out.
+fn run(program: &str, args: &[&str], input: Option<&str>, timeout_secs: u64) -> Option<(bool, String)> {
+    use std::io::{Read, Write};
     let mut command = if cfg!(windows) && program.to_lowercase().ends_with(".cmd") {
         let mut c = Command::new("cmd");
         c.arg("/C").arg(program);
@@ -110,7 +118,8 @@ pub(crate) fn run_capture(program: &str, args: &[&str], timeout_secs: u64) -> Op
     } else {
         Command::new(program)
     };
-    command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+    let stdin = if input.is_some() { Stdio::piped() } else { Stdio::null() };
+    command.args(args).stdin(stdin).stdout(Stdio::piped()).stderr(Stdio::null());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -118,15 +127,17 @@ pub(crate) fn run_capture(program: &str, args: &[&str], timeout_secs: u64) -> Op
         command.creation_flags(CREATE_NO_WINDOW);
     }
     let mut child = command.spawn().ok()?;
+    if let (Some(input), Some(mut pipe)) = (input, child.stdin.take()) {
+        // Dropping the pipe afterwards closes it, so the program sees the end.
+        let _ = pipe.write_all(input.as_bytes());
+    }
     let deadline = Instant::now() + Duration::from_secs(timeout_secs);
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
                 let mut out = String::new();
-                use std::io::Read;
                 child.stdout.take()?.read_to_string(&mut out).ok()?;
-                let out = out.trim().to_string();
-                return (status.success() && !out.is_empty()).then_some(out);
+                return Some((status.success(), out.trim().to_string()));
             }
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
             _ => {
@@ -163,12 +174,9 @@ pub fn load_admin_key(env: &Env) -> Result<(String, &'static str), FetchError> {
 }
 
 fn stored_admin_key() -> Option<String> {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     {
-        run_capture("security", &["find-generic-password", "-s", "klaudometer", "-a", "admin", "-w"], 60)
-    }
-    #[cfg(windows)]
-    {
+        // Keychain item or credential: service "klaudometer", account "admin".
         keyring::Entry::new("klaudometer", "admin").ok()?.get_password().ok().filter(|k| !k.is_empty())
     }
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -176,6 +184,95 @@ fn stored_admin_key() -> Option<String> {
         // Same Secret Service attributes as the Linux helper.
         run_capture("secret-tool", &["lookup", "service", "klaudometer", "key", "admin"], 60)
     }
+}
+
+/// Where the Admin API key was found, for the settings window. It never
+/// carries the key itself.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KeyStatus {
+    /// "environment", the key store's name (`KEY_STORE`), "file", or None.
+    pub source: Option<String>,
+    /// Something wrong with a key that is there, such as a key file others can read.
+    pub problem: Option<String>,
+}
+
+pub fn admin_key_status(env: &Env) -> KeyStatus {
+    match load_admin_key(env) {
+        Ok((_, source)) => KeyStatus { source: Some(source.to_string()), problem: None },
+        Err(_) => KeyStatus { source: None, problem: file_admin_key(env).err().map(|e| e.message) },
+    }
+}
+
+/// A pasted Admin API key, trimmed, or why it isn't one.
+pub fn clean_admin_key(key: &str) -> Result<String, String> {
+    let key = key.trim();
+    if key.is_empty() {
+        return Err("Paste your Admin API key first.".into());
+    }
+    if !key.starts_with("sk-ant-admin") {
+        return Err("That isn't an Admin API key. Admin keys start with sk-ant-admin.".into());
+    }
+    // Something must follow the "sk-ant-admin01-" prefix.
+    if key.len() <= 15 || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return Err("That key looks incomplete, or has extra characters in it.".into());
+    }
+    Ok(key.to_string())
+}
+
+/// Save the Admin API key in the system's key store and return where it
+/// went. On Linux without a working wallet, it goes into a key file only
+/// you can read instead.
+pub fn store_admin_key(env: &Env, key: &str) -> Result<&'static str, String> {
+    let key = clean_admin_key(key)?;
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        let _ = env;
+        keyring::Entry::new("klaudometer", "admin")
+            .and_then(|entry| entry.set_password(&key))
+            .map_err(|e| format!("Couldn't save the key in the {KEY_STORE}: {e}"))?;
+        Ok(KEY_STORE)
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // secret-tool reads the secret from stdin, so it never appears in a command line.
+        let args = ["store", "--label=Klaudometer Admin API key", "service", "klaudometer", "key", "admin"];
+        if matches!(run("secret-tool", &args, Some(&key), 60), Some((true, _))) {
+            return Ok(KEY_STORE);
+        }
+        write_key_file(env, &key)?;
+        Ok("file")
+    }
+}
+
+/// Delete the Admin API key from the key store and the key file. A key in
+/// $ANTHROPIC_ADMIN_KEY stays, since it isn't Klaudometer's to remove.
+pub fn remove_admin_key(env: &Env) -> Result<(), String> {
+    #[cfg(any(target_os = "macos", windows))]
+    match keyring::Entry::new("klaudometer", "admin").and_then(|entry| entry.delete_credential()) {
+        Ok(()) | Err(keyring::Error::NoEntry) => {}
+        Err(e) => return Err(format!("Couldn't remove the key from the {KEY_STORE}: {e}")),
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let _ = run("secret-tool", &["clear", "service", "klaudometer", "key", "admin"], None, 60);
+    let path = env.admin_key_file();
+    match std::fs::remove_file(&path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(format!("Couldn't delete {}: {e}", path.display())),
+        _ => Ok(()),
+    }
+}
+
+/// Write the key file, readable only by you.
+#[cfg(all(unix, not(target_os = "macos")))]
+fn write_key_file(env: &Env, key: &str) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let path = env.admin_key_file();
+    let failed = |e: std::io::Error| format!("Couldn't save the key in {}: {e}", path.display());
+    std::fs::create_dir_all(&env.config_dir).map_err(failed)?;
+    // Start afresh, so an old file's looser permissions can't carry over.
+    let _ = std::fs::remove_file(&path);
+    let mut file = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&path).map_err(failed)?;
+    writeln!(file, "{key}").map_err(failed)
 }
 
 /// The key from the key file, refusing a file other users can read.
@@ -238,6 +335,35 @@ mod tests {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
         assert!(file_admin_key(&env).unwrap_err().message.contains("must be private"));
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(file_admin_key(&env).unwrap().as_deref(), Some("sk-ant-admin01-test"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cleans_pasted_keys() {
+        let key = "sk-ant-admin01-AbC_123-xyz789";
+        assert_eq!(clean_admin_key(&format!("  {key}\n")).as_deref(), Ok(key));
+        assert!(clean_admin_key("").unwrap_err().contains("Paste"));
+        assert!(clean_admin_key("sk-ant-api03-AbC_123-xyz789").unwrap_err().contains("isn't an Admin API key"));
+        assert!(clean_admin_key("sk-ant-admin01-AbC 123-xyz").unwrap_err().contains("incomplete"));
+        assert!(clean_admin_key("sk-ant-admin01-").unwrap_err().contains("incomplete"));
+        assert!(clean_admin_key("sk-ant-admin01-fake").is_ok());
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn key_file_is_written_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("klaudometer-keyfile-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let env = Env { config_dir: dir.clone(), admin_key: None, ..Env::system() };
+        // An old file anyone could read must not pass its permissions on.
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(env.admin_key_file(), "old").unwrap();
+        std::fs::set_permissions(env.admin_key_file(), std::fs::Permissions::from_mode(0o644)).unwrap();
+        write_key_file(&env, "sk-ant-admin01-test").unwrap();
+        let mode = std::fs::metadata(env.admin_key_file()).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
         assert_eq!(file_admin_key(&env).unwrap().as_deref(), Some("sk-ant-admin01-test"));
         let _ = std::fs::remove_dir_all(&dir);
     }

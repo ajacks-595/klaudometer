@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Klaudometer Settings</title>
+  <link rel="stylesheet" href="colors.css">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <nav class="tabs" role="tablist" aria-label="Settings pages">
+    <button role="tab" id="tab-general" aria-controls="general" aria-selected="true">General</button>
+    <button role="tab" id="tab-appearance" aria-controls="appearance" aria-selected="false" tabindex="-1">Appearance</button>
+    <button role="tab" id="tab-spending" aria-controls="spending" aria-selected="false" tabindex="-1">Spending</button>
+    <button role="tab" id="tab-notifications" aria-controls="notifications" aria-selected="false" tabindex="-1">Notifications</button>
+  </nav>
+
+  <main>
+    <section id="general" role="tabpanel" aria-labelledby="tab-general">
+      <div class="row">
+        <div class="label">Show</div>
+        <div class="control">
+          <label><input type="checkbox" data-key="show_five_hour"> 5-hour window</label>
+          <label><input type="checkbox" data-key="show_seven_day"> 7-day window</label>
+          <label><input type="checkbox" data-key="show_extra"> Extra usage, while it's turned on for your plan</label>
+          <p class="hint">Claude API spend is on the Spending page.</p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">Numbers show</div>
+        <div class="control">
+          <label><input type="radio" name="show_remaining" value="false"> How much is used</label>
+          <label><input type="radio" name="show_remaining" value="true"> How much is left</label>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">Pace</div>
+        <div class="control">
+          <label><input type="checkbox" data-key="show_pace"> Project where usage is heading (“Runs out in ~1h 20m”)</label>
+        </div>
+      </div>
+      <div class="row" id="label-row">
+        <div class="label"><label for="label-select" id="label-title">Menu bar text</label></div>
+        <div class="control">
+          <select id="label-select" data-key="label">
+            <option value="full">Full: 5h 81% · 7d 47%</option>
+            <option value="compact">Compact: 81% · 47%</option>
+            <option value="off">Off: just the icon</option>
+          </select>
+          <p class="hint" id="label-hint" hidden>Shown next to the icon where your desktop supports it.</p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label"><label for="refresh">Check usage every</label></div>
+        <div class="control inline">
+          <input type="number" id="refresh" min="1" max="60" step="1" data-key="refresh_minutes"> minutes
+        </div>
+      </div>
+      <div class="separator"></div>
+      <div class="row">
+        <div class="label">Start at login</div>
+        <div class="control">
+          <label><input type="checkbox" id="start-at-login"> Open Klaudometer when you log in</label>
+          <p class="hint error" id="login-error" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="appearance" role="tabpanel" aria-labelledby="tab-appearance" hidden>
+      <div class="row">
+        <div class="label">Theme</div>
+        <div class="control">
+          <div class="themes" id="themes" role="radiogroup" aria-label="Theme"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">Colours</div>
+        <div class="control">
+          <div class="colors" id="colors"></div>
+          <p class="hint">Pick a colour to change just that one. Reset puts back the theme's colour.</p>
+        </div>
+      </div>
+      <div class="separator"></div>
+      <div class="row">
+        <div class="label"><label for="warning">Warning level</label></div>
+        <div class="control inline"><input type="number" id="warning" min="1" max="100" step="1" data-key="warning"> %</div>
+      </div>
+      <div class="row">
+        <div class="label"><label for="critical">Critical level</label></div>
+        <div class="control inline"><input type="number" id="critical" min="1" max="100" step="1" data-key="critical"> %</div>
+      </div>
+      <div class="row">
+        <div class="label"></div>
+        <div class="control">
+          <label><input type="checkbox" data-key="color_by_level"> Change ring colour at these levels</label>
+          <p class="hint">The levels also decide when warning and critical notifications go out. For API spend they're a share of your monthly budget.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="spending" role="tabpanel" aria-labelledby="tab-spending" hidden>
+      <div class="row">
+        <div class="label">Claude API</div>
+        <div class="control">
+          <label><input type="checkbox" data-key="show_api"> Show this month's API spend</label>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label"><label for="budget">Monthly budget</label></div>
+        <div class="control inline">$ <input type="number" id="budget" min="1" step="10" data-key="api_budget" class="wide"></div>
+      </div>
+      <div class="row">
+        <div class="label"></div>
+        <div class="control">
+          <p class="hint">Spend comes from your Console organization's cost report and updates within a few minutes. It needs an Admin API key. Individual Console accounts can't create one, so set up an organization first. The budget is only used for the ring and alerts.</p>
+        </div>
+      </div>
+      <div class="separator"></div>
+      <div class="row">
+        <div class="label">Admin API key</div>
+        <div class="control">
+          <div class="status" id="key-status"><span class="icon" aria-hidden="true"></span><span class="text">Checking…</span></div>
+          <p class="hint" id="api-check" role="status"></p>
+          <form class="key-form" id="key-form" autocomplete="off">
+            <input type="password" id="key-input" placeholder="sk-ant-admin01-…" aria-label="Admin API key" spellcheck="false">
+            <button type="submit" class="button primary" id="key-save">Save Key</button>
+            <button type="button" class="button" id="key-remove" hidden>Remove</button>
+          </form>
+          <p class="hint" id="key-message" role="status"></p>
+          <p class="hint" id="key-where"></p>
+          <a href="#" id="admin-keys">Create an Admin API key in the Claude Console</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="notifications" role="tabpanel" aria-labelledby="tab-notifications" hidden>
+      <div class="row">
+        <div class="label">Notify me</div>
+        <div class="control">
+          <label><input type="checkbox" data-key="notify_warning"> <span>When a meter reaches the warning level (<span data-level="warning"></span>%)</span></label>
+          <label><input type="checkbox" data-key="notify_critical"> <span>When a meter reaches the critical level (<span data-level="critical"></span>%)</span></label>
+          <label><input type="checkbox" data-key="notify_pace"> When a meter is on pace to run out before it resets</label>
+          <label><input type="checkbox" data-key="notify_reset"> When a window resets</label>
+          <p class="hint">Levels are set on the Appearance page. Each alert is sent once per window or month, even if you run Klaudometer in more than one place.</p>
+        </div>
+      </div>
+      <div class="separator"></div>
+      <div class="row">
+        <div class="label"></div>
+        <div class="control">
+          <button type="button" class="button" id="test-notification">Send Test Notification</button>
+          <p class="hint" id="test-result" role="status"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="version">Klaudometer</span>
+    <span id="saved" role="status">Changes are saved as you make them.</span>
+  </footer>
+
+  <script src="settings.js"></script>
+</body>
+</html>

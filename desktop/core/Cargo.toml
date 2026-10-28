@@ -14,8 +14,10 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 dirs = "6"
 ureq = "2"
 
-[target.'cfg(target_os = "windows")'.dependencies]
-keyring = { version = "3", features = ["windows-native"] }
+# The Admin API key lives in the Keychain or Credential Manager. On Linux it
+# goes through secret-tool, like the Python helper, so no D-Bus library is needed.
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
 
 [dev-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
