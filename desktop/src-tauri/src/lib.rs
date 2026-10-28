@@ -65,6 +65,10 @@ struct TrayUpdate {
 }
 
 pub fn run() {
+    // Runs before anything else, so it never hands over to a running copy.
+    if std::env::args().any(|arg| arg == "--store-admin-key") {
+        std::process::exit(store_admin_key_from_stdin());
+    }
     let env = Env::system();
     let (wake, woken) = channel();
     tauri::Builder::default()
@@ -143,6 +147,27 @@ pub fn run() {
                 api.prevent_exit();
             }
         });
+}
+
+/// `klaudometer --store-admin-key` saves a key piped to it the way the
+/// settings window does, for scripted setups. Reading it from stdin keeps it
+/// out of the process list. On macOS this also makes the Keychain item the
+/// app's own, so reading it back needs no permission prompt.
+fn store_admin_key_from_stdin() -> i32 {
+    let mut key = String::new();
+    if std::io::stdin().read_line(&mut key).is_err() {
+        eprintln!("Couldn't read the key from stdin.");
+        return 1;
+    }
+    match credentials::store_admin_key(&Env::system(), &key) {
+        Ok("file") => println!("Saved the Admin API key in a private key file."),
+        Ok(place) => println!("Saved the Admin API key in the {place}."),
+        Err(e) => {
+            eprintln!("{e}");
+            return 1;
+        }
+    }
+    0
 }
 
 /// The background loop: fetch when due (or when asked), then refresh the

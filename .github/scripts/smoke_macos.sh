@@ -23,8 +23,6 @@ trap 'kill "$mock" 2>/dev/null || true; [ -n "$name" ] && pkill -x "$name" 2>/de
 expires=$(( ($(date +%s) + 86400) * 1000 ))
 login='{"claudeAiOauth":{"accessToken":"fake-oauth-token","expiresAt":'"$expires"',"subscriptionType":"max","rateLimitTier":"default_claude_max_5x"}}'
 security add-generic-password -U -A -a "$USER" -s "Claude Code-credentials" -w "$login"
-# Where Klaudometer's settings window saves the Admin API key.
-security add-generic-password -U -A -a admin -s klaudometer -w "sk-ant-admin01-fake"
 
 # Show API spend as well, with the full tray label.
 settings="$HOME/Library/Application Support/klaudometer"
@@ -33,6 +31,13 @@ echo '{"show_api": true, "label": "full"}' > "$settings/desktop.json"
 
 binary="$(find "$app/Contents/MacOS" -type f -perm -u+x | head -1)"
 name="$(basename "$binary")"
+
+# Save the Admin API key the way the settings window does. A Keychain item
+# made by the security tool would belong to Apple's tools, and the app would
+# get a permission prompt that nobody can answer here. perl's alarm stands in
+# for timeout, which macOS lacks.
+echo "sk-ant-admin01-fake" | perl -e 'alarm 60; exec @ARGV' "$binary" --store-admin-key
+
 echo "Launching $binary"
 export KLAUDOMETER_API_BASE="http://127.0.0.1:$port"
 "$binary" > "$out/app.log" 2>&1 &
@@ -44,7 +49,15 @@ for _ in $(seq 1 60); do
 done
 cp "$cache"/*.json "$out/" 2>/dev/null || true
 
-python3 - "$cache" <<'EOF'
+# On failure, a screenshot shows any dialog the app is waiting on.
+fail() {
+    screencapture -x "$out/failure.png" || true
+    echo "App log:"
+    cat "$out/app.log"
+    exit 1
+}
+
+python3 - "$cache" <<'EOF' || fail
 import json, sys
 cache = sys.argv[1]
 usage = json.load(open(f"{cache}/usage.json"))
@@ -58,9 +71,8 @@ print("OK: login and Admin key read from the Keychain; usage and API spend fetch
 EOF
 
 if ! pgrep -x "$name" > /dev/null; then
-    echo "The app isn't running:"
-    cat "$out/app.log"
-    exit 1
+    echo "The app isn't running."
+    fail
 fi
 echo "OK: app still running"
 

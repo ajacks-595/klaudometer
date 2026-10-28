@@ -38,7 +38,11 @@ window only ever learns where the key is, never the key itself.
 
 `klaudometer --settings` opens the settings window, and `--settings=spending` (or `general`,
 `appearance`, `notifications`) opens it on that page. If Klaudometer is already running, the running
-copy opens it.
+copy opens it. For scripted setups, `klaudometer --store-admin-key` saves a key piped to it the same
+way the settings window does.
+
+On macOS, save the key from Klaudometer rather than with the `security` tool: a Keychain item the
+tool made makes macOS ask before Klaudometer can read it.
 
 ## Where things live
 
@@ -64,6 +68,8 @@ The builds aren't signed yet, so:
 
 - **macOS** blocks the app the first time. Open it from **System Settings › Privacy & Security ›
   Open Anyway**.
+- **macOS** may ask once after each update whether Klaudometer can use its Admin API key in the
+  Keychain, because an unsigned app looks new to macOS each time. Choose **Always Allow**.
 - **Windows** SmartScreen may warn about an unknown publisher. Choose **More info › Run anyway**.
 - **Windows 11** puts new tray icons in the hidden icons area (the **^** by the clock). Drag
   Klaudometer's icon onto the taskbar, or turn it on in **Settings › Personalization › Taskbar ›
