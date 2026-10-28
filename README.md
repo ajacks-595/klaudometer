@@ -252,6 +252,8 @@ On a Mac, Klaudometer sits in the menu bar. On Windows, it sits in the system tr
   start at login, and [API spend](#claude-api-spend).
 - **Notifications** at the warning and critical levels, when you're on pace to run out, and when a
   window resets, as on Linux.
+- **Updates:** once a day it asks GitHub whether there's a newer version. If there is, the menu and
+  card say so and link to it. You can turn this off in **Settings › General**.
 
 ### Install
 
@@ -322,6 +324,9 @@ tray icon. It only talks to `api.anthropic.com`, and there's no telemetry.
 - The macOS and Windows app does the same in Rust (`desktop/core`). On a Mac it reads Claude Code's
   login from the Keychain, where Claude Code keeps it. On Linux it shares the widget's cache and alert
   record, so each alert is sent only once whichever front ends you run.
+- **Update check (macOS and Windows app only):** at startup and then once a day, the app asks GitHub
+  for Klaudometer's latest release (`api.github.com/repos/ajacks-595/klaudometer/releases/latest`).
+  The request carries only the app's version number. Turn it off in **Settings › General**.
 
 ## Known limitations
 
@@ -353,7 +358,9 @@ Klaudometer is an unofficial, independent project. It isn't made, endorsed or su
   Anthropic's own apps. Klaudometer is neither, so use the subscription meters at your own risk.
 - **API spend:** this uses your own Admin API key, and the terms explicitly allow managing your own
   API keys.
-- **No telemetry:** the only network requests go to `api.anthropic.com`.
+- **No telemetry:** the widget and tray icon only contact `api.anthropic.com`. The macOS and Windows
+  app also asks GitHub once a day whether there's a new version, which you can turn off. Klaudometer
+  never sends your usage, your login or your keys anywhere else.
 
 Klaudometer is provided as is, without warranty of any kind. See the [license](LICENSE).
 

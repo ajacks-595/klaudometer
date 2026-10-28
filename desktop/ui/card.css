@@ -129,6 +129,28 @@ header button:hover {
   color: var(--warning);
 }
 
+/* A newer release: a quiet strip above the footer. */
+.update {
+  display: block;
+  margin-top: 14px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: var(--chip);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.update:hover {
+  text-decoration: underline;
+}
+
+.update[hidden] {
+  display: none;
+}
+
 footer {
   display: flex;
   justify-content: space-between;

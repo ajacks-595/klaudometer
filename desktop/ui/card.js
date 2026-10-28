@@ -108,6 +108,9 @@ function render(summary) {
   const plan = document.getElementById("plan");
   plan.hidden = !summary.plan;
   plan.textContent = summary.plan;
+  const update = document.getElementById("update");
+  update.hidden = !summary.update;
+  update.textContent = summary.update ? `Update available: Klaudometer ${summary.update.version}` : "";
   const footer = document.getElementById("footer");
   footer.textContent = summary.footer;
   footer.className = summary.errors.length ? "error" : "";
@@ -119,6 +122,10 @@ document.getElementById("close").addEventListener("click", () => invoke("hide_ca
 document.getElementById("usage-page").addEventListener("click", (e) => {
   e.preventDefault();
   invoke("open_link", { link: "usage" });
+});
+document.getElementById("update").addEventListener("click", (e) => {
+  e.preventDefault();
+  invoke("open_link", { link: "update" });
 });
 document.getElementById("settings").addEventListener("click", (e) => {
   e.preventDefault();

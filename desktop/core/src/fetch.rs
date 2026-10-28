@@ -60,7 +60,7 @@ pub fn fetch(env: &Env, request: &Request, now: f64) -> Usage {
 
 /// GET a JSON document. `auth_errors` maps HTTP status codes to messages for
 /// credential problems.
-fn request_json(url: &str, headers: &[(&str, &str)], auth_errors: &[(u16, &str)]) -> Result<Value, FetchError> {
+pub(crate) fn request_json(url: &str, headers: &[(&str, &str)], auth_errors: &[(u16, &str)]) -> Result<Value, FetchError> {
     let mut request = ureq::get(url)
         .timeout(Duration::from_secs(15))
         .set("Accept", "application/json")

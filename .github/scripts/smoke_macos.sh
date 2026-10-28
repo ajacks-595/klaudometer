@@ -40,11 +40,12 @@ echo "sk-ant-admin01-fake" | perl -e 'alarm 60; exec @ARGV' "$binary" --store-ad
 
 echo "Launching $binary"
 export KLAUDOMETER_API_BASE="http://127.0.0.1:$port"
+export KLAUDOMETER_GITHUB_API="http://127.0.0.1:$port"
 "$binary" > "$out/app.log" 2>&1 &
 
 cache="$HOME/Library/Caches/klaudometer"
 for _ in $(seq 1 60); do
-    [ -f "$cache/usage.json" ] && [ -f "$cache/api.json" ] && break
+    [ -f "$cache/usage.json" ] && [ -f "$cache/api.json" ] && [ -f "$cache/update.json" ] && break
     sleep 1
 done
 cp "$cache"/*.json "$out/" 2>/dev/null || true
@@ -67,7 +68,10 @@ assert usage["plan"] == "Max 5x", usage
 assert usage["windows"]["five_hour"]["used"] == 81.0, usage
 assert usage["extra"]["used"] == 12.34, usage
 assert api["error"] is None and abs(api["spent"] - 42.75) < 1e-9, api
+update = json.load(open(f"{cache}/update.json"))
+assert update["latest"] == "99.0.0" and update["error"] is None, update
 print("OK: login and Admin key read from the Keychain; usage and API spend fetched and cached")
+print("OK: update check found 99.0.0")
 EOF
 
 if ! pgrep -x "$name" > /dev/null; then

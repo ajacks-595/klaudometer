@@ -50,12 +50,13 @@ Set-Content -Path (Join-Path $settings "desktop.json") -Value '{"show_api": true
 cmdkey /generic:admin.klaudometer /user:admin /pass:sk-ant-admin01-fake | Out-Null
 
 $env:KLAUDOMETER_API_BASE = "http://127.0.0.1:$port"
+$env:KLAUDOMETER_GITHUB_API = "http://127.0.0.1:$port"
 $app = Start-Process $exe.FullName -PassThru
 
 try {
     $cache = Join-Path $env:LOCALAPPDATA "klaudometer"
     for ($i = 0; $i -lt 60; $i++) {
-        if ((Test-Path "$cache\usage.json") -and (Test-Path "$cache\api.json")) { break }
+        if ((Test-Path "$cache\usage.json") -and (Test-Path "$cache\api.json") -and (Test-Path "$cache\update.json")) { break }
         Start-Sleep -Seconds 1
     }
     Copy-Item "$cache\*.json" $Out -ErrorAction SilentlyContinue
@@ -67,6 +68,9 @@ try {
     }
     if ($api.error -or [math]::Abs($api.spent - 42.75) -gt 1e-9) { throw "Unexpected API spend: $($api | ConvertTo-Json)" }
     Write-Host "OK: login read from .credentials.json and Admin key from Credential Manager; usage and API spend fetched and cached"
+    $update = Get-Content "$cache\update.json" -Raw | ConvertFrom-Json
+    if ($update.latest -ne "99.0.0" -or $update.error) { throw "Unexpected update check: $($update | ConvertTo-Json)" }
+    Write-Host "OK: update check found 99.0.0"
 
     if ($app.HasExited) { throw "The app exited with code $($app.ExitCode)" }
     Write-Host "OK: app still running"

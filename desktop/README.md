@@ -28,7 +28,7 @@ saved as you make them, and the icon and card update straight away.
 
 | Page | What's on it |
 |---|---|
-| General | Which meters to show, used or left, pace, the text beside the icon (macOS and Linux), how often to check, and start at login. |
+| General | Which meters to show, used or left, pace, the text beside the icon (macOS and Linux), how often to check, start at login, and the daily update check. |
 | Appearance | Theme, single colour overrides, and the warning and critical levels. |
 | Spending | Claude API spend, the monthly budget, and saving or removing the Admin API key. |
 | Notifications | Which alerts to send, and a test notification. |
@@ -55,8 +55,9 @@ tool made makes macOS ask before Klaudometer can read it.
 | Settings | `~/Library/Application Support/klaudometer/desktop.json` | `%APPDATA%\klaudometer\desktop.json` | `~/.config/klaudometer/desktop.json` |
 | Cache and alert record | `~/Library/Caches/klaudometer/` | `%LOCALAPPDATA%\klaudometer\` | `~/.cache/klaudometer/` |
 
-`$ANTHROPIC_ADMIN_KEY` overrides the stored key, `$CLAUDE_CONFIG_DIR` changes where Claude Code's
-login is read from, and `$KLAUDOMETER_API_BASE` points everything at another server, for testing.
+`$ANTHROPIC_ADMIN_KEY` overrides the stored key, and `$CLAUDE_CONFIG_DIR` changes where Claude Code's
+login is read from. For testing, `$KLAUDOMETER_API_BASE` points the Anthropic requests at another
+server, and `$KLAUDOMETER_GITHUB_API` does the same for the update check.
 
 ## Builds
 

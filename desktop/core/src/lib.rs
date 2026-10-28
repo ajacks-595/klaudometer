@@ -14,12 +14,16 @@ pub mod format;
 pub mod meters;
 pub mod model;
 pub mod settings;
+pub mod update;
 
 pub use env::Env;
 pub use fetch::{fetch, FetchError, Request};
 pub use meters::{alert_requests, build_meters, summary, Alert, Card, Meter, Summary};
 pub use model::Usage;
 pub use settings::Settings;
+
+/// Klaudometer's version, shared by every front end.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Seconds since the Unix epoch, as the cache files store them.
 pub fn now() -> f64 {

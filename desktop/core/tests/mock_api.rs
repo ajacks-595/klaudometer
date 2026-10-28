@@ -1,8 +1,9 @@
 //! End-to-end fetching against a local stand-in for Anthropic's API: the
 //! usage endpoint with a Claude Code login, the cost report over two pages
-//! with an Admin key, the shared cache, and error handling.
+//! with an Admin key, the shared cache, and error handling. The same stand-in
+//! answers the update check's question to GitHub.
 
-use klaudometer_core::{fetch, Env, Request};
+use klaudometer_core::{fetch, update, Env, Request};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -83,6 +84,11 @@ fn respond(path: &str, headers: &[String]) -> (&'static str, String) {
         };
         return ("200 OK", body.to_string());
     }
+    if path == "/repos/ajacks-595/klaudometer/releases/latest" {
+        assert!(has("x-github-api-version: 2022-11-28"));
+        let body = serde_json::json!({"tag_name": "v9.9.9", "html_url": "https://github.com/ajacks-595/klaudometer/releases/tag/v9.9.9"});
+        return ("200 OK", body.to_string());
+    }
     ("404 Not Found", "{}".into())
 }
 
@@ -100,6 +106,7 @@ fn test_env(name: &str, base: &str) -> Env {
     .unwrap();
     Env {
         api_base: base.to_string(),
+        github_api: base.to_string(),
         claude_dir,
         cache_dir: root.join("cache"),
         config_dir: root.join("config"),
@@ -188,4 +195,29 @@ fn reads_caches_written_by_the_linux_helper() {
     assert_eq!(usage.subscription.plan, "Pro");
     assert_eq!(usage.subscription.windows["five_hour"].used, 28.0);
     assert_eq!(usage.subscription.windows["seven_day"].resets_at, None);
+}
+
+#[test]
+fn update_check_finds_a_newer_release_and_remembers_it() {
+    let (base, served) = start_mock();
+    let env = test_env("update", &base);
+    let now = klaudometer_core::now();
+    let found = update::check(&env, 3600.0, now);
+    assert_eq!(found.latest.as_deref(), Some("9.9.9"));
+    let offer = update::available(&found, "1.1.0").unwrap();
+    assert_eq!(offer.url, "https://github.com/ajacks-595/klaudometer/releases/tag/v9.9.9");
+    assert!(update::available(&found, "9.9.9").is_none());
+
+    // Within a day the saved check is reused, so a restart doesn't ask again.
+    assert_eq!(update::check(&env, 86400.0, now + 600.0), found);
+    assert_eq!(served.load(Ordering::SeqCst), 1);
+
+    // When GitHub can't be reached, the last good answer stays, and it tries
+    // again after an hour rather than a day.
+    let offline = Env { github_api: "http://127.0.0.1:9".into(), ..env.clone() };
+    let failed = update::check(&offline, 86400.0, now + 90000.0);
+    assert!(failed.error.is_some());
+    assert_eq!(failed.latest.as_deref(), Some("9.9.9"));
+    assert_eq!(update::check(&offline, 86400.0, now + 90600.0), failed);
+    assert_ne!(update::check(&offline, 86400.0, now + 94000.0).checked_at, failed.checked_at);
 }

@@ -410,6 +410,8 @@ pub struct Summary {
     pub errors: Vec<String>,
     /// The card's last line: errors, "Updated 3 minutes ago" or "Loading…".
     pub footer: String,
+    /// A newer release, which the desktop app fills in after its update check.
+    pub update: Option<crate::update::Update>,
 }
 
 pub fn summary(usage: Option<&Usage>, settings: &Settings, now: f64) -> Summary {
@@ -459,7 +461,7 @@ pub fn summary(usage: Option<&Usage>, settings: &Settings, now: f64) -> Summary 
     };
     let label = label_text(&rings, settings);
     let cards = meters.iter().map(|m| card(m, settings)).collect();
-    Summary { meters, cards, rings, label, rows, plan, errors, footer }
+    Summary { meters, cards, rings, label, rows, plan, errors, footer, update: None }
 }
 
 /// A notification to send if no other front end has sent it already.

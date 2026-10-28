@@ -7,6 +7,7 @@ mod ring_icon;
 
 use klaudometer_core::credentials::{self, KeyStatus};
 use klaudometer_core::meters::{palette, Colors, THEMES};
+use klaudometer_core::update::{self, Update};
 use klaudometer_core::{self as core, claims, Env, Settings, Summary, Usage};
 use serde::Serialize;
 use std::collections::HashSet;
@@ -31,12 +32,16 @@ const USAGE_PAGE: &str = "https://claude.ai/settings/usage";
 const ADMIN_KEYS_PAGE: &str = "https://platform.claude.com/settings/admin-keys";
 /// How often countdowns, pace and alerts are re-checked between fetches.
 const TICK: Duration = Duration::from_secs(20);
+/// How often the update checker looks at its setting and the time.
+const UPDATE_TICK: Duration = Duration::from_secs(600);
 const ICON_SIZE: u32 = 64;
 
 struct AppState {
     inner: Mutex<Inner>,
     /// Wakes the background thread early, for Refresh Now.
     wake: Sender<()>,
+    /// Wakes the update checker, when its setting may have changed.
+    wake_checker: Sender<()>,
 }
 
 #[derive(Default)]
@@ -54,6 +59,8 @@ struct Inner {
     hidden_on_blur: Option<Instant>,
     /// The card opened above the tray icon, so it grows upwards.
     card_above: bool,
+    /// A newer release, from the update checker.
+    update: Option<Update>,
 }
 
 /// What the tray needs after an update, applied outside the lock.
@@ -71,6 +78,7 @@ pub fn run() {
     }
     let env = Env::system();
     let (wake, woken) = channel();
+    let (wake_checker, checker_woken) = channel();
     tauri::Builder::default()
         // Must come first: a second launch just opens the card (or settings) of the first.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| match settings_arg(&args) {
@@ -80,7 +88,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
-        .manage(AppState { inner: Mutex::new(Inner::default()), wake })
+        .manage(AppState { inner: Mutex::new(Inner::default()), wake, wake_checker })
         .invoke_handler(tauri::generate_handler![
             get_summary,
             refresh_now,
@@ -136,7 +144,9 @@ pub fn run() {
             if let Some(page) = settings_arg(&std::env::args().collect::<Vec<_>>()) {
                 show_settings(&handle, &page);
             }
+            let checker = (handle.clone(), env.clone());
             std::thread::spawn(move || worker(handle, env, woken));
+            std::thread::spawn(move || update_checker(checker.0, checker.1, checker_woken));
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -168,6 +178,37 @@ fn store_admin_key_from_stdin() -> i32 {
         }
     }
     0
+}
+
+/// Checks GitHub for a newer release while the setting is on: at startup
+/// (unless it checked within the hour, say before a restart), then once a day.
+fn update_checker(app: AppHandle, env: Env, woken: Receiver<()>) {
+    let mut max_age = 3600.0;
+    loop {
+        let found = Settings::load(&env.settings_file())
+            .check_updates
+            .then(|| update::available(&update::check(&env, max_age, core::now()), core::VERSION))
+            .flatten();
+        max_age = 86400.0;
+        let state = app.state::<AppState>();
+        let changed = {
+            let mut inner = state.inner.lock().unwrap();
+            std::mem::replace(&mut inner.update, found.clone()) != found
+        };
+        if changed {
+            let _ = state.wake.send(());
+        }
+        let _ = woken.recv_timeout(UPDATE_TICK);
+    }
+}
+
+/// Open the newer release's page. Its address was checked to be one of
+/// Klaudometer's GitHub releases.
+fn open_update_page(app: &AppHandle) {
+    let update = app.state::<AppState>().inner.lock().unwrap().update.clone();
+    if let Some(update) = update {
+        let _ = app.opener().open_url(update.url, None::<&str>);
+    }
 }
 
 /// The background loop: fetch when due (or when asked), then refresh the
@@ -207,7 +248,8 @@ fn update(app: &AppHandle, env: &Env, settings: &Settings, now: f64) -> bool {
     let state = app.state::<AppState>();
     let (summary, tray, alerts) = {
         let mut inner = state.inner.lock().unwrap();
-        let summary = core::summary(inner.usage.as_ref(), settings, now);
+        let mut summary = core::summary(inner.usage.as_ref(), settings, now);
+        summary.update = inner.update.clone().filter(|_| settings.check_updates);
 
         let icon = ring_icon::render(&summary.rings, ICON_SIZE);
         let icon = (icon != inner.last_icon).then(|| {
@@ -218,7 +260,8 @@ fn update(app: &AppHandle, env: &Env, settings: &Settings, now: f64) -> bool {
             inner.last_label = summary.label.clone();
             summary.label.clone()
         });
-        let rows: Vec<String> = summary.rows.iter().map(|r| r.text.clone()).collect();
+        let mut rows: Vec<String> = summary.rows.iter().map(|r| r.text.clone()).collect();
+        rows.extend(summary.update.as_ref().map(|u| u.version.clone()));
         let menu = (rows != inner.last_rows).then(|| {
             inner.last_rows = rows;
             summary.clone()
@@ -272,6 +315,11 @@ fn update(app: &AppHandle, env: &Env, settings: &Settings, now: f64) -> bool {
 
 fn build_menu(app: &AppHandle, summary: &Summary) -> tauri::Result<Menu<Wry>> {
     let menu = Menu::new(app)?;
+    if let Some(update) = &summary.update {
+        let text = format!("Update Available: Klaudometer {}…", update.version);
+        menu.append(&MenuItem::with_id(app, "update", text, true, None::<&str>)?)?;
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+    }
     for row in &summary.rows {
         // Headlines open the card; detail lines are greyed out.
         let item = MenuItem::with_id(app, format!("row:{}", row.key), &row.text, !row.detail, None::<&str>)?;
@@ -294,6 +342,7 @@ fn on_menu(app: &AppHandle, id: &str) {
             let _ = app.opener().open_url(USAGE_PAGE, None::<&str>);
         }
         "settings" => show_settings(app, ""),
+        "update" => open_update_page(app),
         "quit" => app.exit(0),
         _ if id == "card" || id.starts_with("row:") => show_card(app, None),
         _ => {}
@@ -423,12 +472,16 @@ async fn refresh_now(app: AppHandle) -> Result<(), ()> {
     Ok(())
 }
 
-/// Open one of Klaudometer's links in the browser. Only these two.
+/// Open one of Klaudometer's links in the browser. Only these.
 #[tauri::command]
 async fn open_link(app: AppHandle, link: String) -> Result<(), ()> {
     let url = match link.as_str() {
         "usage" => USAGE_PAGE,
         "admin-keys" => ADMIN_KEYS_PAGE,
+        "update" => {
+            open_update_page(&app);
+            return Ok(());
+        }
         _ => return Ok(()),
     };
     let _ = app.opener().open_url(url, None::<&str>);
@@ -510,7 +563,9 @@ async fn get_settings(app: AppHandle) -> Result<SettingsView, ()> {
 async fn save_settings(app: AppHandle, settings: Settings) -> Result<Settings, String> {
     let settings = settings.normalized();
     settings.save(&Env::system().settings_file()).map_err(|e| format!("Couldn't save your settings: {e}"))?;
-    let _ = app.state::<AppState>().wake.send(());
+    let state = app.state::<AppState>();
+    let _ = state.wake.send(());
+    let _ = state.wake_checker.send(());
     Ok(settings)
 }
 

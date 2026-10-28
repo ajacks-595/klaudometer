@@ -6,6 +6,8 @@ use std::path::PathBuf;
 #[derive(Clone, Debug)]
 pub struct Env {
     pub api_base: String,
+    /// GitHub's API, asked for the latest release by the update check.
+    pub github_api: String,
     /// Claude Code's configuration folder: `~/.claude`, or $CLAUDE_CONFIG_DIR.
     pub claude_dir: PathBuf,
     pub cache_dir: PathBuf,
@@ -24,6 +26,10 @@ impl Env {
         Env {
             api_base: var("KLAUDOMETER_API_BASE")
                 .unwrap_or_else(|| "https://api.anthropic.com".into())
+                .trim_end_matches('/')
+                .to_string(),
+            github_api: var("KLAUDOMETER_GITHUB_API")
+                .unwrap_or_else(|| "https://api.github.com".into())
                 .trim_end_matches('/')
                 .to_string(),
             // Claude Code keys its Keychain entry to a custom config folder,
@@ -54,6 +60,10 @@ impl Env {
 
     pub fn settings_file(&self) -> PathBuf {
         self.config_dir.join("desktop.json")
+    }
+
+    pub fn update_file(&self) -> PathBuf {
+        self.cache_dir.join("update.json")
     }
 
     pub fn admin_key_file(&self) -> PathBuf {

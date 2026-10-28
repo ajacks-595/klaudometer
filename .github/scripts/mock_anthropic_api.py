@@ -1,5 +1,6 @@
-"""A local stand-in for the two Anthropic endpoints Klaudometer reads, for CI
-smoke tests and screenshots. Nothing here talks to Anthropic.
+"""A local stand-in for the two Anthropic endpoints Klaudometer reads, and for
+GitHub's latest-release endpoint the desktop app's update check asks, for CI
+smoke tests and screenshots. Nothing here talks to Anthropic or GitHub.
 
   python3 mock_anthropic_api.py PORT [demo|calm]
 
@@ -8,7 +9,8 @@ demo: 5-hour at 81% with 2h left (warning colour, "runs out" pace), 7-day at
 calm: 5-hour at 42%, 7-day at 63%, no extra usage.
 
 It expects the OAuth token "fake-oauth-token" and the Admin key
-"sk-ant-admin01-fake", and answers anything else with 401.
+"sk-ant-admin01-fake", and answers anything else with 401. The latest release
+is always v99.0.0, so the update check always finds one.
 """
 import json
 import sys
@@ -79,6 +81,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("x-api-key") != ADMIN_KEY:
                 return self.send(401, {"error": "bad key"})
             return self.send(200, cost_report(parse_qs(url.query).get("page", [""])[0]))
+        if url.path == "/repos/ajacks-595/klaudometer/releases/latest":
+            return self.send(200, {"tag_name": "v99.0.0",
+                                   "html_url": "https://github.com/ajacks-595/klaudometer/releases/tag/v99.0.0"})
         self.send(404, {"error": "not found"})
 
     def log_message(self, fmt, *args):

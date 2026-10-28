@@ -35,6 +35,8 @@ pub struct Settings {
     pub notify_critical: bool,
     pub notify_pace: bool,
     pub notify_reset: bool,
+    /// Ask GitHub once a day whether there's a newer release (desktop app only).
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -62,6 +64,7 @@ impl Default for Settings {
             notify_critical: true,
             notify_pace: false,
             notify_reset: false,
+            check_updates: true,
         }
     }
 }
