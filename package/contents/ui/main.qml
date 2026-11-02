@@ -44,6 +44,10 @@ PlasmoidItem {
         return errors.join("\n");
     }
     readonly property string plan: usage && usage.plan ? usage.plan : ""
+    // Claude Code's login has ended, so only signing in again brings the numbers back.
+    readonly property bool needsSignIn: wantSubscription && !!(usage && usage.needs_sign_in)
+    property string signInError: ""
+    property real signInStarted: 0
 
     readonly property var colors: Themes.colors(cfg.theme, {
         highlight: Kirigami.Theme.highlightColor,
@@ -450,6 +454,14 @@ PlasmoidItem {
         }
     }
 
+    // Open a terminal running `claude auth login`, then check back every few
+    // seconds so the widget recovers as soon as the sign-in is done.
+    function signIn() {
+        signInError = "";
+        signInStarted = Date.now() / 1000;
+        runner.connectSource("python3 '" + scriptPath + "' --sign-in --instance " + Plasmoid.id);
+    }
+
     function refresh(force) {
         now = Date.now() / 1000;
         if (loading && now - loadingSince < 90) {
@@ -495,6 +507,12 @@ PlasmoidItem {
 
     Plasmoid.contextualActions: [
         PlasmaCore.Action {
+            text: i18n("Sign In to Claude Code…")
+            icon.name: "im-user"
+            visible: root.needsSignIn
+            onTriggered: root.signIn()
+        },
+        PlasmaCore.Action {
             text: i18n("Refresh Now")
             icon.name: "view-refresh"
             onTriggered: root.refresh(true)
@@ -514,6 +532,14 @@ PlasmoidItem {
             disconnectSource(sourceName);
             if (sourceName.indexOf(" --claim ") >= 0) {
                 root.handleClaims(sourceName, data.stdout);
+                return;
+            }
+            if (sourceName.indexOf(" --sign-in ") >= 0) {
+                try {
+                    root.signInError = JSON.parse(data.stdout).error || "";
+                } catch (e) {
+                    root.signInError = i18n("Couldn't open a terminal. Run `claude auth login` in one.");
+                }
                 return;
             }
             root.loading = false;
@@ -537,6 +563,21 @@ PlasmoidItem {
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refresh(false)
+    }
+
+    // After Sign In, look again every 15 seconds for 10 minutes. Checking a
+    // signed-out login is local, so this costs nothing until it's back.
+    Timer {
+        interval: 15000
+        running: root.signInStarted > 0 && root.needsSignIn
+        repeat: true
+        onTriggered: {
+            if (Date.now() / 1000 - root.signInStarted > 600) {
+                root.signInStarted = 0;
+                return;
+            }
+            root.refresh(true);
+        }
     }
 
     Timer {

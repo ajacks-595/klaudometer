@@ -24,12 +24,16 @@ instance had claimed before. Instances notify only for what they claim, so each
 alert pops up once even with the widget on several panels.
 
 With --check-key it only reports whether an Admin API key can be found.
+
+With --sign-in it opens a terminal running `claude auth login`, for when
+Claude Code's login has ended, and prints {"opened": true} or an "error".
 """
 import argparse
 import fcntl
 import glob
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import time
@@ -64,6 +68,23 @@ CLAUDE_DIRS = [
     "~/.volta/bin", "~/bin", "/usr/local/bin",
 ]
 
+# Claude Code commands that renew its login when that's due, without a model
+# request, so they cost no usage. The second is a fallback in case a later
+# version changes the first. (`claude auth status` can exit before its renewal
+# finishes, so it isn't reliable.)
+RENEW_COMMANDS = [["doctor"], ["plugin", "marketplace", "list"]]
+# Claude Code renews its access token in the last 5 minutes before it runs
+# out (and any time after, while its refresh token lasts).
+RENEW_MARGIN_SECONDS = 300
+SIGNED_OUT = "Signed out of Claude Code. Run `claude auth login` in a terminal."
+# Terminals to open `claude auth login` in, and how each takes a command.
+TERMINALS = [
+    ("konsole", ["-e"]), ("kgx", ["--"]), ("gnome-terminal", ["--"]), ("ptyxis", ["--"]),
+    ("xfce4-terminal", ["-x"]), ("mate-terminal", ["-x"]), ("tilix", ["-e"]),
+    ("lxterminal", ["-e"]), ("qterminal", ["-e"]), ("alacritty", ["-e"]), ("kitty", []),
+    ("foot", []), ("wezterm", ["start", "--"]), ("x-terminal-emulator", ["-e"]), ("xterm", ["-e"]),
+]
+
 WINDOWS = {"five_hour": 5 * 3600, "seven_day": 7 * 86400}
 ERROR_RETRY_SECONDS = 60
 # Alert IDs embed their window's reset time or month, so they can't recur
@@ -72,10 +93,12 @@ CLAIM_TTL_SECONDS = 35 * 86400
 
 
 class FetchError(Exception):
-    def __init__(self, message, retry_after=ERROR_RETRY_SECONDS, auth=False):
+    def __init__(self, message, retry_after=ERROR_RETRY_SECONDS, auth=False, sign_in=False):
         super().__init__(message)
         self.retry_after = retry_after
         self.auth = auth
+        # Only signing in again fixes it, so front ends offer to do that.
+        self.sign_in = sign_in
 
 
 def request_json(url, headers, auth_errors):
@@ -106,33 +129,54 @@ def load_credentials():
     try:
         with open(CREDS_PATH) as f:
             return json.load(f)["claudeAiOauth"]
-    except (OSError, ValueError, KeyError):
-        raise FetchError("Not signed in to Claude Code. Run `claude` and log in.", 300)
+    except (OSError, ValueError, KeyError, TypeError):
+        raise FetchError(SIGNED_OUT, ERROR_RETRY_SECONDS, auth=True, sign_in=True)
 
 
-def token_expired(creds):
-    return creds.get("expiresAt", 0) / 1000 < time.time() + 60
+def login_state(creds, now):
+    """Where Claude Code's login stands: "ok", "due" (Claude Code would renew
+    it now), or "signed_out" (only signing in again helps)."""
+    if not creds.get("accessToken"):
+        return "signed_out"
+    expires = (creds.get("expiresAt") or 0) / 1000
+    if expires > now + RENEW_MARGIN_SECONDS:
+        return "ok"
+    refresh_until = creds.get("refreshTokenExpiresAt")
+    can_renew = bool(creds.get("refreshToken")) and (
+        not isinstance(refresh_until, (int, float)) or refresh_until / 1000 > now
+    )
+    if can_renew:
+        return "due"
+    # It can't be renewed: use it while it lasts.
+    return "ok" if expires > now + 60 else "signed_out"
 
 
-def refresh_via_cli():
-    """Ask the Claude Code CLI to refresh its own login (best effort).
-
-    We never refresh the token ourselves: refresh tokens rotate, and racing
-    Claude Code for one could log it out.
-    """
+def find_claude():
+    """Claude Code's CLI, and a PATH that finds it. Apps started from the desktop
+    often lack the per-user install folders on their PATH."""
     extra = [os.path.expanduser(p) for p in CLAUDE_DIRS]
     extra += sorted(glob.glob(os.path.expanduser("~/.nvm/versions/node/*/bin")), reverse=True)
     path = os.pathsep.join(extra + [os.environ.get("PATH", "/usr/bin:/bin")])
-    claude = shutil.which("claude", path=path)
+    return shutil.which("claude", path=path), path
+
+
+def renew_via_cli(args):
+    """Have Claude Code renew its own login (best effort).
+
+    Klaudometer never renews the login itself: refresh tokens rotate, and
+    racing Claude Code for one could log it out. Claude Code renews under its
+    own lock and saves the result where it always does.
+    """
+    claude, path = find_claude()
     if not claude:
         return
     try:
         subprocess.run(
-            [claude, "auth", "status"],
+            [claude, *args],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            timeout=30,
+            timeout=60,
             env={**os.environ, "PATH": path},
         )
     except (OSError, subprocess.SubprocessError):
@@ -143,25 +187,55 @@ def request_usage(token):
     return request_json(
         USAGE_URL,
         {"Authorization": f"Bearer {token}", "anthropic-beta": "oauth-2025-04-20"},
-        {401: "Login expired. Open Claude Code to refresh it."},
+        {401: "Claude Code's login was turned down. Run `claude auth login` in a terminal."},
     )
 
 
-def fetch_raw():
+def fetch_raw(now):
     creds = load_credentials()
-    if token_expired(creds):
-        refresh_via_cli()
+    for args in RENEW_COMMANDS:
+        if login_state(creds, now) != "due":
+            break
+        renew_via_cli(args)
         creds = load_credentials()
-        if token_expired(creds):
-            raise FetchError("Login expired. Open Claude Code to refresh it.", 120)
+    state = login_state(creds, now)
+    if state == "signed_out":
+        raise FetchError(SIGNED_OUT, ERROR_RETRY_SECONDS, auth=True, sign_in=True)
+    if state == "due" and (creds.get("expiresAt") or 0) / 1000 < now + 60:
+        raise FetchError("Waiting for Claude Code to renew its login.", 120, auth=True)
     try:
         return request_usage(creds["accessToken"]), creds
     except FetchError as e:
-        if not e.auth:
-            raise
-        refresh_via_cli()
-        creds = load_credentials()
-        return request_usage(creds["accessToken"]), creds
+        if e.auth:
+            e.sign_in = True
+        raise
+
+
+def open_sign_in():
+    """Open a terminal running `claude auth login`. Returns None, or why not."""
+    claude, path = find_claude()
+    if not claude:
+        return "Claude Code isn't installed, or Klaudometer can't find it."
+    script = f"{shlex.quote(claude)} auth login; echo; echo 'You can close this window.'; read -r _"
+    preferred = os.environ.get("TERMINAL")
+    terminals = ([(preferred, ["-e"])] if preferred else []) + TERMINALS
+    for name, flags in terminals:
+        terminal = shutil.which(name, path=path)
+        if not terminal:
+            continue
+        try:
+            subprocess.Popen(
+                [terminal, *flags, "sh", "-c", script],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                env={**os.environ, "PATH": path},
+            )
+            return None
+        except OSError:
+            continue
+    return "No terminal found. Run `claude auth login` in a terminal."
 
 
 def plan_name(creds):
@@ -212,7 +286,7 @@ def extra_usage(raw):
 
 
 def fetch_subscription(now):
-    raw, creds = fetch_raw()
+    raw, creds = fetch_raw(now)
     windows = {}
     for key, length in WINDOWS.items():
         w = raw.get(key)
@@ -354,6 +428,10 @@ def cached(path, max_age, now, fetch, empty):
     except FetchError as e:
         result = dict(cache or empty)
         result.update(stale=True, error=str(e), next_attempt_at=now + e.retry_after)
+        if e.sign_in:
+            result["needs_sign_in"] = True
+        else:
+            result.pop("needs_sign_in", None)
     write_json(path, result)
     return result
 
@@ -394,10 +472,19 @@ def main():
         help="only report whether an Admin API key can be found",
     )
     parser.add_argument(
+        "--sign-in", action="store_true",
+        help="open a terminal running `claude auth login`",
+    )
+    parser.add_argument(
         "--instance", metavar="ID",
         help="ignored; keeps each widget's command unique so Plasma doesn't share its output",
     )
     args = parser.parse_args()
+
+    if args.sign_in:
+        error = open_sign_in()
+        print(json.dumps({"opened": error is None, "error": error}))
+        return
 
     if args.check_key:
         try:

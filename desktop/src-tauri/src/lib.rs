@@ -103,6 +103,7 @@ pub fn run() {
             save_admin_key,
             remove_admin_key,
             test_notification,
+            sign_in,
         ])
         .setup(move |app| {
             // A menu bar app: no Dock icon.
@@ -202,6 +203,25 @@ fn update_checker(app: AppHandle, env: Env, woken: Receiver<()>) {
     }
 }
 
+/// Open a terminal running `claude auth login`, then check every 15 seconds
+/// for 10 minutes, so the numbers come back as soon as the sign-in is done.
+/// Checking a signed-out login is local, so this costs nothing until then.
+fn start_sign_in(app: &AppHandle) -> Result<(), String> {
+    credentials::open_sign_in()?;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        for _ in 0..40 {
+            std::thread::sleep(Duration::from_secs(15));
+            let signed_out = app.state::<AppState>().inner.lock().unwrap().summary.as_ref().is_some_and(|s| s.needs_sign_in);
+            if !signed_out {
+                break;
+            }
+            request_refresh(&app);
+        }
+    });
+    Ok(())
+}
+
 /// Open the newer release's page. Its address was checked to be one of
 /// Klaudometer's GitHub releases.
 fn open_update_page(app: &AppHandle) {
@@ -262,6 +282,7 @@ fn update(app: &AppHandle, env: &Env, settings: &Settings, now: f64) -> bool {
         });
         let mut rows: Vec<String> = summary.rows.iter().map(|r| r.text.clone()).collect();
         rows.extend(summary.update.as_ref().map(|u| u.version.clone()));
+        rows.push(summary.needs_sign_in.to_string());
         let menu = (rows != inner.last_rows).then(|| {
             inner.last_rows = rows;
             summary.clone()
@@ -315,6 +336,10 @@ fn update(app: &AppHandle, env: &Env, settings: &Settings, now: f64) -> bool {
 
 fn build_menu(app: &AppHandle, summary: &Summary) -> tauri::Result<Menu<Wry>> {
     let menu = Menu::new(app)?;
+    if summary.needs_sign_in {
+        menu.append(&MenuItem::with_id(app, "sign_in", "Sign In to Claude Code…", true, None::<&str>)?)?;
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+    }
     if let Some(update) = &summary.update {
         let text = format!("Update Available: Klaudometer {}…", update.version);
         menu.append(&MenuItem::with_id(app, "update", text, true, None::<&str>)?)?;
@@ -343,6 +368,11 @@ fn on_menu(app: &AppHandle, id: &str) {
         }
         "settings" => show_settings(app, ""),
         "update" => open_update_page(app),
+        "sign_in" => {
+            if let Err(error) = start_sign_in(app) {
+                let _ = app.notification().builder().title("Klaudometer").body(&error).show();
+            }
+        }
         "quit" => app.exit(0),
         _ if id == "card" || id.starts_with("row:") => show_card(app, None),
         _ => {}
@@ -599,6 +629,11 @@ async fn remove_admin_key(app: AppHandle) -> Result<KeyStatus, String> {
     credentials::remove_admin_key(&env)?;
     request_refresh(&app);
     Ok(credentials::admin_key_status(&env))
+}
+
+#[tauri::command]
+async fn sign_in(app: AppHandle) -> Result<(), String> {
+    start_sign_in(&app)
 }
 
 #[tauri::command]

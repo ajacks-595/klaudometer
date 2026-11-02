@@ -1,6 +1,7 @@
 //! Reading Claude Code's login, and reading and storing the Admin API key.
-//! Klaudometer only reads Claude Code's login and never refreshes it itself:
+//! Klaudometer only reads Claude Code's login and never renews it itself:
 //! refresh tokens rotate, and racing Claude Code for one could log it out.
+//! When a renewal is due, it has Claude Code do it (`renew_via_cli`).
 
 use crate::env::Env;
 use crate::fetch::FetchError;
@@ -10,18 +11,54 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+/// Claude Code commands that renew its login when that's due, without a model
+/// request, so they cost no usage. The second is a fallback in case a later
+/// version changes the first. (`claude auth status` can exit before its renewal
+/// finishes, so it isn't reliable.)
+pub const RENEW_COMMANDS: &[&[&str]] = &[&["doctor"], &["plugin", "marketplace", "list"]];
+/// Claude Code renews its access token in the last 5 minutes before it runs
+/// out (and any time after, while its refresh token lasts).
+const RENEW_MARGIN_SECONDS: f64 = 300.0;
+pub const SIGNED_OUT: &str = "Signed out of Claude Code. Run `claude auth login` in a terminal.";
+
 /// The parts of Claude Code's stored login that Klaudometer uses.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClaudeLogin {
     pub access_token: String,
     pub expires_at_ms: f64,
+    pub has_refresh_token: bool,
+    /// When the refresh token stops working, if Claude Code recorded it.
+    pub refresh_expires_at_ms: Option<f64>,
     pub subscription_type: String,
     pub rate_limit_tier: String,
 }
 
+/// Where Claude Code's login stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoginState {
+    Ok,
+    /// Claude Code would renew it now.
+    Due,
+    /// Only signing in again helps.
+    SignedOut,
+}
+
 impl ClaudeLogin {
-    pub fn expired(&self, now: f64) -> bool {
-        self.expires_at_ms / 1000.0 < now + 60.0
+    pub fn state(&self, now: f64) -> LoginState {
+        if self.access_token.is_empty() {
+            return LoginState::SignedOut;
+        }
+        let expires = self.expires_at_ms / 1000.0;
+        if expires > now + RENEW_MARGIN_SECONDS {
+            return LoginState::Ok;
+        }
+        let can_renew = self.has_refresh_token && self.refresh_expires_at_ms.is_none_or(|t| t / 1000.0 > now);
+        match (can_renew, expires > now + 60.0) {
+            (true, _) => LoginState::Due,
+            // It can't be renewed: use it while it lasts.
+            (false, true) => LoginState::Ok,
+            (false, false) => LoginState::SignedOut,
+        }
     }
 
     pub fn plan_name(&self) -> String {
@@ -44,8 +81,10 @@ pub fn parse_login(text: &str) -> Option<ClaudeLogin> {
     let oauth = value.get("claudeAiOauth")?;
     let text = |key: &str| oauth.get(key).and_then(Value::as_str).unwrap_or_default().to_string();
     Some(ClaudeLogin {
-        access_token: oauth.get("accessToken")?.as_str()?.to_string(),
+        access_token: text("accessToken"),
         expires_at_ms: oauth.get("expiresAt").and_then(Value::as_f64).unwrap_or(0.0),
+        has_refresh_token: !text("refreshToken").is_empty(),
+        refresh_expires_at_ms: oauth.get("refreshTokenExpiresAt").and_then(Value::as_f64),
         subscription_type: text("subscriptionType"),
         rate_limit_tier: text("rateLimitTier"),
     })
@@ -64,15 +103,72 @@ pub fn load_claude_login(env: &Env) -> Result<ClaudeLogin, FetchError> {
     std::fs::read_to_string(env.claude_dir.join(".credentials.json"))
         .ok()
         .and_then(|text| parse_login(&text))
-        .ok_or_else(|| FetchError::new("Not signed in to Claude Code. Run `claude` and log in.", 300.0))
+        .ok_or_else(|| FetchError::signed_out(SIGNED_OUT))
 }
 
-/// Ask the Claude Code CLI to refresh its own login (best effort).
-pub fn refresh_via_cli() {
+/// Have Claude Code renew its own login (best effort). It renews under its
+/// own lock and saves the result where it always does.
+pub fn renew_via_cli(args: &[&str]) {
     if let Some(claude) = find_claude() {
-        let _ = run_capture(&claude.to_string_lossy(), &["auth", "status"], 30);
+        let _ = run(&claude.to_string_lossy(), args, None, 60);
     }
 }
+
+/// Open a terminal running `claude auth login`: Terminal on a Mac, a console
+/// window on Windows, and the desktop's terminal on Linux.
+pub fn open_sign_in() -> Result<(), String> {
+    let claude = find_claude().ok_or("Claude Code isn't installed, or Klaudometer can't find it.")?;
+    let claude = claude.to_string_lossy().to_string();
+    let spawn = |program: &str, args: &[&str]| {
+        let mut command = Command::new(program);
+        command.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        // Windows: hide the cmd that runs `start`; the window it starts still shows.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x0800_0000);
+        }
+        command.spawn().is_ok()
+    };
+    let opened = if cfg!(target_os = "macos") {
+        // AppleScript string: escape backslashes and quotes.
+        let command = format!("'{}' auth login", claude.replace('\'', "'\\''"));
+        let script = format!(
+            "tell application \"Terminal\"\nactivate\ndo script \"{}\"\nend tell",
+            command.replace('\\', "\\\\").replace('"', "\\\"")
+        );
+        spawn("osascript", &["-e", &script])
+    } else if cfg!(windows) {
+        spawn("cmd", &["/c", "start", "Claude Code sign-in", "cmd", "/k", &claude, "auth", "login"])
+    } else {
+        let script = format!("'{}' auth login; echo; echo 'You can close this window.'; read -r _", claude.replace('\'', "'\\''"));
+        LINUX_TERMINALS.iter().any(|(terminal, flags)| {
+            let mut args: Vec<&str> = flags.to_vec();
+            args.extend(["sh", "-c", &script]);
+            spawn(terminal, &args)
+        })
+    };
+    if opened { Ok(()) } else { Err("Couldn't open a terminal. Run `claude auth login` in one.".into()) }
+}
+
+/// Terminals to open `claude auth login` in on Linux, and how each takes a command.
+const LINUX_TERMINALS: &[(&str, &[&str])] = &[
+    ("konsole", &["-e"]),
+    ("kgx", &["--"]),
+    ("gnome-terminal", &["--"]),
+    ("ptyxis", &["--"]),
+    ("xfce4-terminal", &["-x"]),
+    ("mate-terminal", &["-x"]),
+    ("tilix", &["-e"]),
+    ("lxterminal", &["-e"]),
+    ("qterminal", &["-e"]),
+    ("alacritty", &["-e"]),
+    ("kitty", &[]),
+    ("foot", &[]),
+    ("wezterm", &["start", "--"]),
+    ("x-terminal-emulator", &["-e"]),
+    ("xterm", &["-e"]),
+];
 
 /// Where Claude Code's CLI usually lives. Apps started from the desktop often
 /// have a PATH without the per-user install folders, so check those too.
@@ -306,16 +402,26 @@ mod tests {
         .unwrap();
         assert_eq!(login.access_token, "tok");
         assert_eq!(login.plan_name(), "Max 20x");
-        assert!(login.expired(2000.0 - 30.0));
-        assert!(!login.expired(1000.0));
+        assert!(!login.has_refresh_token);
+        assert_eq!(login.state(1000.0), LoginState::Ok);
+        // No refresh token: usable until it runs out, then signed out.
+        assert_eq!(login.state(1850.0), LoginState::Ok);
+        assert_eq!(login.state(1990.0), LoginState::SignedOut);
         assert!(parse_login(r#"{"other":{}}"#).is_none());
     }
 
     #[test]
     fn plan_names() {
         let plan = |kind: &str, tier: &str| {
-            ClaudeLogin { access_token: String::new(), expires_at_ms: 0.0, subscription_type: kind.into(), rate_limit_tier: tier.into() }
-                .plan_name()
+            ClaudeLogin {
+                access_token: String::new(),
+                expires_at_ms: 0.0,
+                has_refresh_token: false,
+                refresh_expires_at_ms: None,
+                subscription_type: kind.into(),
+                rate_limit_tier: tier.into(),
+            }
+            .plan_name()
         };
         assert_eq!(plan("pro", "default_claude_ai"), "Pro");
         assert_eq!(plan("max", "default_claude_max_5x"), "Max 5x");
@@ -337,6 +443,24 @@ mod tests {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
         assert_eq!(file_admin_key(&env).unwrap().as_deref(), Some("sk-ant-admin01-test"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn login_states_follow_claude_codes_renewal() {
+        // expiresAt 10 000 s; refresh token good until 50 000 s.
+        let login = parse_login(
+            r#"{"claudeAiOauth":{"accessToken":"tok","refreshToken":"ref","expiresAt":10000000,"refreshTokenExpiresAt":50000000}}"#,
+        )
+        .unwrap();
+        assert_eq!(login.state(9000.0), LoginState::Ok);
+        // Inside Claude Code's 5-minute margin, and after expiry, it can renew.
+        assert_eq!(login.state(9800.0), LoginState::Due);
+        assert_eq!(login.state(20000.0), LoginState::Due);
+        // Once the refresh token has expired, only signing in helps.
+        assert_eq!(login.state(60000.0), LoginState::SignedOut);
+        // Claude Code blanks the tokens when a login ends.
+        let blanked = parse_login(r#"{"claudeAiOauth":{"accessToken":"","refreshToken":"","expiresAt":0,"subscriptionType":"pro"}}"#).unwrap();
+        assert_eq!(blanked.state(1.0), LoginState::SignedOut);
     }
 
     #[test]

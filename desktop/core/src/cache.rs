@@ -13,11 +13,13 @@ pub trait Cacheable: Serialize + DeserializeOwned {
     fn fetched_at(&self) -> f64;
     fn has_error(&self) -> bool;
     fn next_attempt_at(&self) -> f64;
-    fn mark_stale(&mut self, error: String, next_attempt_at: f64);
+    fn mark_stale(&mut self, error: &FetchError, next_attempt_at: f64);
 }
 
+/// `cacheable!(Type)`, or `cacheable!(Type, flag)` to also record in `flag`
+/// whether only signing in again can fix the error.
 macro_rules! cacheable {
-    ($type:ty) => {
+    ($type:ty $(, $sign_in:ident)?) => {
         impl Cacheable for $type {
             fn fetched_at(&self) -> f64 {
                 self.fetched_at
@@ -28,16 +30,17 @@ macro_rules! cacheable {
             fn next_attempt_at(&self) -> f64 {
                 self.next_attempt_at
             }
-            fn mark_stale(&mut self, error: String, next_attempt_at: f64) {
+            fn mark_stale(&mut self, error: &FetchError, next_attempt_at: f64) {
                 self.stale = true;
-                self.error = Some(error);
+                self.error = Some(error.message.clone());
                 self.next_attempt_at = next_attempt_at;
+                $(self.$sign_in = error.sign_in;)?
             }
         }
     };
 }
 
-cacheable!(Subscription);
+cacheable!(Subscription, needs_sign_in);
 cacheable!(ApiSpend);
 
 /// Run `f` holding the cache lock. If the lock can't be taken (an unwritable
@@ -94,7 +97,7 @@ pub fn cached<T: Cacheable>(
         Ok(result) => result,
         Err(e) => {
             let mut result = cache.unwrap_or(empty);
-            result.mark_stale(e.message, now + e.retry_after);
+            result.mark_stale(&e, now + e.retry_after);
             result
         }
     };

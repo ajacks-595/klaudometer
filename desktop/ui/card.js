@@ -108,6 +108,8 @@ function render(summary) {
   const plan = document.getElementById("plan");
   plan.hidden = !summary.plan;
   plan.textContent = summary.plan;
+  // Claude Code's login has ended: offer to open `claude auth login`.
+  document.getElementById("sign-in").hidden = !summary.needs_sign_in;
   const update = document.getElementById("update");
   update.hidden = !summary.update;
   update.textContent = summary.update ? `Update available: Klaudometer ${summary.update.version}` : "";
@@ -122,6 +124,13 @@ document.getElementById("close").addEventListener("click", () => invoke("hide_ca
 document.getElementById("usage-page").addEventListener("click", (e) => {
   e.preventDefault();
   invoke("open_link", { link: "usage" });
+});
+document.getElementById("sign-in").addEventListener("click", (e) => {
+  e.preventDefault();
+  invoke("sign_in").catch((error) => {
+    e.target.textContent = String(error);
+    fit();
+  });
 });
 document.getElementById("update").addEventListener("click", (e) => {
   e.preventDefault();

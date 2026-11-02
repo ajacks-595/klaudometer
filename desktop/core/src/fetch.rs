@@ -2,7 +2,7 @@
 //! login) and the Console cost report (with an Admin API key).
 
 use crate::cache::{cached, with_lock};
-use crate::credentials::{load_admin_key, load_claude_login, refresh_via_cli, ClaudeLogin};
+use crate::credentials::{load_admin_key, load_claude_login, renew_via_cli, ClaudeLogin, LoginState, RENEW_COMMANDS, SIGNED_OUT};
 use crate::env::Env;
 use crate::model::{ApiSpend, Extra, Subscription, Usage, Window};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
@@ -16,21 +16,28 @@ const ERROR_RETRY_SECONDS: f64 = 60.0;
 const WINDOWS: [(&str, f64); 2] = [("five_hour", 5.0 * 3600.0), ("seven_day", 7.0 * 86400.0)];
 
 /// A failed fetch: a message for people, how long to wait before trying
-/// again, and whether it was a credentials problem.
+/// again, whether it was a credentials problem, and whether only signing in
+/// again can fix it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FetchError {
     pub message: String,
     pub retry_after: f64,
     pub auth: bool,
+    pub sign_in: bool,
 }
 
 impl FetchError {
     pub fn new(message: &str, retry_after: f64) -> FetchError {
-        FetchError { message: message.to_string(), retry_after, auth: false }
+        FetchError { message: message.to_string(), retry_after, auth: false, sign_in: false }
     }
 
     fn auth(message: &str) -> FetchError {
-        FetchError { message: message.to_string(), retry_after: 120.0, auth: true }
+        FetchError { message: message.to_string(), retry_after: 120.0, auth: true, sign_in: false }
+    }
+
+    /// Claude Code's login has ended. Checking again is local, so it's cheap.
+    pub(crate) fn signed_out(message: &str) -> FetchError {
+        FetchError { message: message.to_string(), retry_after: ERROR_RETRY_SECONDS, auth: true, sign_in: true }
     }
 }
 
@@ -87,34 +94,38 @@ pub(crate) fn request_json(url: &str, headers: &[(&str, &str)], auth_errors: &[(
 
 // --- Subscription limits ----------------------------------------------------
 
-const LOGIN_EXPIRED: &str = "Login expired. Open Claude Code to refresh it.";
+const LOGIN_REFUSED: &str = "Claude Code's login was turned down. Run `claude auth login` in a terminal.";
 
 fn request_usage(env: &Env, login: &ClaudeLogin) -> Result<Value, FetchError> {
     let bearer = format!("Bearer {}", login.access_token);
     request_json(
         &format!("{}/api/oauth/usage", env.api_base),
         &[("Authorization", &bearer), ("anthropic-beta", "oauth-2025-04-20")],
-        &[(401, LOGIN_EXPIRED)],
+        &[(401, LOGIN_REFUSED)],
     )
 }
 
+/// Claude Code renews its login in the last few minutes before it runs out.
+/// When that's due, have Claude Code do it, then use whatever it saved.
 fn fetch_raw(env: &Env, now: f64) -> Result<(Value, ClaudeLogin), FetchError> {
     let mut login = load_claude_login(env)?;
-    if login.expired(now) {
-        refresh_via_cli();
+    for args in RENEW_COMMANDS {
+        if login.state(now) != LoginState::Due {
+            break;
+        }
+        renew_via_cli(args);
         login = load_claude_login(env)?;
-        if login.expired(now) {
-            return Err(FetchError::auth(LOGIN_EXPIRED));
-        }
     }
-    match request_usage(env, &login) {
-        Err(e) if e.auth => {
-            refresh_via_cli();
-            let login = load_claude_login(env)?;
-            Ok((request_usage(env, &login)?, login))
+    match login.state(now) {
+        LoginState::SignedOut => return Err(FetchError::signed_out(SIGNED_OUT)),
+        LoginState::Due if login.expires_at_ms / 1000.0 < now + 60.0 => {
+            return Err(FetchError::auth("Waiting for Claude Code to renew its login."));
         }
-        result => Ok((result?, login)),
+        _ => {}
     }
+    request_usage(env, &login)
+        .map(|raw| (raw, login))
+        .map_err(|e| FetchError { sign_in: e.auth, ..e })
 }
 
 pub fn to_epoch(iso: &str) -> Option<f64> {
@@ -173,6 +184,7 @@ pub fn fetch_subscription(env: &Env, now: f64) -> Result<Subscription, FetchErro
         stale: false,
         error: None,
         next_attempt_at: 0.0,
+        needs_sign_in: false,
     })
 }
 

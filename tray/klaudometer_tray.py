@@ -411,11 +411,18 @@ def status(usage, settings, now):
         errors.append("API spend: " + usage["api"]["error"])
     if errors:
         rows.extend((f"error{i}", e, True) for i, e in enumerate(errors))
+        if needs_sign_in(usage, settings):
+            rows.append(("signin", "Sign In to Claude Code…", False))
     elif usage and usage.get("fetched_at"):
         rows.append(("updated", "Updated " + fmt_ago(usage["fetched_at"], now), True))
     else:
         rows.append(("updated", "Loading…", True))
     return meters, rings, label_text(rings, settings), rows
+
+
+def needs_sign_in(usage, settings):
+    """Claude Code's login has ended, so only signing in again helps."""
+    return bool(usage and usage.get("needs_sign_in") and wants_subscription(settings))
 
 
 def helper_args(settings, force):
@@ -488,6 +495,7 @@ class Tray:
         self.usage = None
         self.loading_since = 0
         self.last_forced = 0
+        self.sign_in_started = 0
         self.known_alerts = set()
         self.icon_counter = 0
         self.last_svg = None
@@ -551,6 +559,28 @@ class Tray:
             reason = err.strip().splitlines()[-1] if err.strip() else "Couldn't run the usage helper."
             self.usage = dict(self.usage or {}, stale=True, error=reason)
         self.update()
+
+    def sign_in(self):
+        """Open a terminal running `claude auth login`, then check back every
+        15 seconds for 10 minutes so the icon recovers once it's done."""
+        def opened(out, _err):
+            try:
+                error = json.loads(out).get("error")
+            except ValueError:
+                error = "Couldn't open a terminal."
+            if error:
+                self._notify("Klaudometer", error + " Run `claude auth login` in a terminal.", "normal")
+        self.run_helper(["--sign-in"], opened)
+        if not self.sign_in_started:
+            self.GLib.timeout_add_seconds(15, self._on_sign_in_tick)
+        self.sign_in_started = time.time()
+
+    def _on_sign_in_tick(self):
+        if not needs_sign_in(self.usage, self.settings) or time.time() - self.sign_in_started > 600:
+            self.sign_in_started = 0
+            return False
+        self.refresh(True)
+        return True
 
     def _on_refresh_timer(self):
         self.refresh(False)
@@ -628,6 +658,8 @@ class Tray:
         for key, text, greyed in rows:
             item = Gtk.MenuItem(label=text)
             item.set_sensitive(not greyed)
+            if key == "signin":
+                item.connect("activate", lambda *_: self.sign_in())
             menu.append(item)
             self.items[key] = item
         menu.append(Gtk.SeparatorMenuItem())

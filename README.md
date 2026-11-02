@@ -10,8 +10,9 @@ It can also show your subscription's **extra usage** and your **Claude API spend
 | KDE Plasma 6 | a [desktop and panel widget](#plasma-widget) | the `.plasmoid` from [Releases][releases], or `./install.sh` |
 | GNOME, XFCE, Cinnamon, MATE, Budgie, LXQt or Plasma 5 | a [tray icon](#tray-icon-gnome-xfce-cinnamon-and-others) | `tray/install.sh` from the source |
 
-The subscription meters use Claude Code's login on the same computer, so install Claude Code and log
-in first.
+The subscription meters use Claude Code's login on the same computer, so install Claude Code and run
+`claude auth login` in a terminal first. Signing in to the Claude desktop app doesn't sign in the
+`claude` command.
 
 [releases]: https://github.com/ajacks-595/klaudometer/releases
 
@@ -257,7 +258,8 @@ On a Mac, Klaudometer sits in the menu bar. On Windows, it sits in the system tr
 
 ### Install
 
-Klaudometer uses Claude Code's login on the same computer, so install Claude Code and log in first.
+Klaudometer uses Claude Code's login on the same computer, so install Claude Code and run
+`claude auth login` in a terminal first.
 Then download it from [Releases][releases]:
 
 - **macOS 11 or later** (Apple silicon or Intel): `Klaudometer_<version>_universal.dmg`. Open it
@@ -312,9 +314,10 @@ tray icon. It only talks to `api.anthropic.com`, and there's no telemetry.
 - **Subscription limits and extra usage:** it reads the login Claude Code stores in
   `~/.claude/.credentials.json` and calls `https://api.anthropic.com/api/oauth/usage`, the same
   endpoint Claude Code's `/usage` screen uses. The endpoint isn't documented, so it could change.
-  The widget never refreshes your login token itself, because that could log Claude Code out.
-  If the token has expired, it runs `claude auth status` and shows the last known values until
-  Claude Code has a fresh token.
+  Claude Code's login lasts about 8 hours at a time. Klaudometer never renews it itself, because
+  that could sign Claude Code out. Instead, in the last few minutes before it runs out, it runs
+  `claude doctor`, which makes Claude Code renew it. That doesn't use the model, so it doesn't count
+  towards your usage.
 - **API spend:** `GET /v1/organizations/cost_report` for the current month (UTC), checked at most
   every 10 minutes.
 - Results are cached in `~/.cache/klaudometer/`, so every copy of the widget shares a single request.
@@ -332,9 +335,9 @@ tray icon. It only talks to `api.anthropic.com`, and there's no telemetry.
 
 - **API spend and extra usage** have only been tested against a stand-in for Anthropic's API.
   Neither has run with a real Admin API key or with extra usage actually turned on.
-- **Expired logins:** if Claude Code isn't used for a few hours, its login token expires. Klaudometer
-  runs `claude auth status`, but it hasn't been confirmed whether that renews the token. Opening
-  Claude Code always does, and the widget catches up on its next check.
+- **Signing in again:** however often it's renewed, Claude Code's sign-in ends about a month after
+  you sign in. Klaudometer then shows **Sign In to Claude Code…**, which opens `claude auth login` in
+  a terminal, and the numbers come back within 15 seconds of you finishing.
 - **Display:** the widget has been checked in a dark theme at 100% scaling. Light themes and high-DPI
   scaling haven't been checked yet.
 - **Not shown yet:** per-model weekly limits (Opus, Sonnet) on Max plans.
@@ -353,7 +356,8 @@ Klaudometer is an unofficial, independent project. It isn't made, endorsed or su
   which Anthropic doesn't document. It can change or stop working at any time.
 - **Your Claude Code login:** to fetch those numbers, Klaudometer reads the login Claude Code stores on
   your computer and sends it only to `api.anthropic.com`, the same place Claude Code sends it. It never
-  stores, copies or sends the login anywhere else, and it never refreshes it.
+  stores, copies or sends the login anywhere else. It doesn't renew the login itself either: it has
+  Claude Code do that.
 - **Anthropic's terms:** these describe Claude Code's login as intended for Claude Code and
   Anthropic's own apps. Klaudometer is neither, so use the subscription meters at your own risk.
 - **API spend:** this uses your own Admin API key, and the terms explicitly allow managing your own

@@ -167,13 +167,33 @@ fn rejected_admin_key_keeps_last_good_spend() {
 }
 
 #[test]
-fn missing_login_is_explained() {
-    let (base, _) = start_mock();
+fn signed_out_logins_ask_to_sign_in_again() {
+    let (base, served) = start_mock();
     let env = test_env("nologin", &base);
-    std::fs::remove_file(env.claude_dir.join(".credentials.json")).unwrap();
-    let usage = fetch(&env, &Request { api: false, ..everything(true) }, klaudometer_core::now());
-    assert_eq!(usage.subscription.error.as_deref(), Some("Not signed in to Claude Code. Run `claude` and log in."));
-    assert!(usage.subscription.stale);
+    let request = Request { api: false, ..everything(true) };
+    let creds = env.claude_dir.join(".credentials.json");
+
+    // No login at all.
+    std::fs::remove_file(&creds).unwrap();
+    let usage = fetch(&env, &request, klaudometer_core::now());
+    assert_eq!(usage.subscription.error.as_deref(), Some("Signed out of Claude Code. Run `claude auth login` in a terminal."));
+    assert!(usage.subscription.stale && usage.subscription.needs_sign_in);
+
+    // A login Claude Code ended: it blanks the tokens and keeps the rest.
+    std::fs::write(&creds, r#"{"claudeAiOauth":{"accessToken":"","refreshToken":"","expiresAt":0,"refreshTokenExpiresAt":1000,"subscriptionType":"pro"}}"#).unwrap();
+    let usage = fetch(&env, &request, klaudometer_core::now());
+    assert!(usage.subscription.needs_sign_in);
+    // Neither asked Anthropic anything.
+    assert_eq!(served.load(Ordering::SeqCst), 0);
+
+    // The shared cache records it the way the Linux helper does, and drops it once signed in.
+    let cached: serde_json::Value = serde_json::from_slice(&std::fs::read(env.usage_cache()).unwrap()).unwrap();
+    assert_eq!(cached["needs_sign_in"], true);
+    let env = test_env("nologin", &base);
+    let usage = fetch(&env, &request, klaudometer_core::now());
+    assert!(!usage.subscription.needs_sign_in && usage.subscription.error.is_none());
+    let cached: serde_json::Value = serde_json::from_slice(&std::fs::read(env.usage_cache()).unwrap()).unwrap();
+    assert!(cached.get("needs_sign_in").is_none());
 }
 
 #[test]

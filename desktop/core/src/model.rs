@@ -34,6 +34,9 @@ pub struct Subscription {
     pub stale: bool,
     pub error: Option<String>,
     pub next_attempt_at: f64,
+    /// Claude Code's login has ended: only signing in again brings the numbers back.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub needs_sign_in: bool,
 }
 
 /// Claude API spend for the current month (UTC), in currency units.

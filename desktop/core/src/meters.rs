@@ -412,6 +412,8 @@ pub struct Summary {
     pub footer: String,
     /// A newer release, which the desktop app fills in after its update check.
     pub update: Option<crate::update::Update>,
+    /// Claude Code's login has ended, so the app offers to sign in again.
+    pub needs_sign_in: bool,
 }
 
 pub fn summary(usage: Option<&Usage>, settings: &Settings, now: f64) -> Summary {
@@ -461,7 +463,8 @@ pub fn summary(usage: Option<&Usage>, settings: &Settings, now: f64) -> Summary 
     };
     let label = label_text(&rings, settings);
     let cards = meters.iter().map(|m| card(m, settings)).collect();
-    Summary { meters, cards, rings, label, rows, plan, errors, footer, update: None }
+    let needs_sign_in = settings.wants_subscription() && usage.is_some_and(|u| u.subscription.needs_sign_in);
+    Summary { meters, cards, rings, label, rows, plan, errors, footer, update: None, needs_sign_in }
 }
 
 /// A notification to send if no other front end has sent it already.
