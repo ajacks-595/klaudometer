@@ -1,0 +1,36 @@
+# Weekly version updates for the GitHub Actions in .github/workflows and the
+# desktop app's Rust crates. Security updates are turned on in the repository
+# settings and don't wait for this schedule. The Desktop app workflow builds
+# and smoke-tests every pull request on macOS and Windows.
+#
+# The Plasma widget and tray icon use only Python's standard library and Qt
+# from the system, so there's nothing else to watch. The Tauri CLI is fetched
+# with `npx @tauri-apps/cli@2` at build time and stays on Tauri 2.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Wait a week after a release, so a bad or compromised one is caught first.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /desktop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      # Tauri and its plugins release together and need matching versions.
+      tauri:
+        patterns: ["tauri", "tauri-*"]
+      # Everything else that stays compatible comes in one pull request.
+      # Major versions come one per pull request, since they may need code changes.
+      crates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
