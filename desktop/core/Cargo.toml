@@ -11,7 +11,7 @@ repository.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-dirs = "6"
+dirs = "7"
 ureq = "2"
 
 # The Admin API key lives in the Keychain or Credential Manager. On Linux it
