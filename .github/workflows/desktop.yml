@@ -24,7 +24,7 @@ jobs:
     name: Tests (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check every version number matches
         run: python3 .github/scripts/check_versions.py
       - name: Check the app icons are 8-bit RGBA
@@ -46,7 +46,7 @@ jobs:
     name: macOS build and smoke test
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
@@ -59,13 +59,13 @@ jobs:
       - name: Smoke test
         run: bash .github/scripts/smoke_macos.sh desktop/target/universal-apple-darwin/release/bundle/macos/Klaudometer.app smoke
       - name: Upload the .dmg
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: klaudometer-macos
           path: desktop/target/universal-apple-darwin/release/bundle/dmg/*.dmg
       - name: Upload smoke test output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-macos
           path: smoke/
@@ -74,7 +74,7 @@ jobs:
     name: Windows build and smoke test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -88,7 +88,7 @@ jobs:
           $msi = (Get-ChildItem desktop/target/release/bundle/msi/*.msi | Select-Object -First 1).FullName
           ./.github/scripts/smoke_windows.ps1 -Msi $msi -Out smoke
       - name: Upload the installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: klaudometer-windows
           path: |
@@ -96,7 +96,7 @@ jobs:
             desktop/target/release/bundle/nsis/*.exe
       - name: Upload smoke test output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-windows
           path: smoke/
