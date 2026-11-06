@@ -1997,7 +1997,7 @@ name = "klaudometer-core"
 version = "1.1.1"
 dependencies = [
  "chrono",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "keyring",
  "serde",
  "serde_json",
