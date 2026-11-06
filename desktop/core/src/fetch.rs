@@ -68,28 +68,28 @@ pub fn fetch(env: &Env, request: &Request, now: f64) -> Usage {
 /// GET a JSON document. `auth_errors` maps HTTP status codes to messages for
 /// credential problems.
 pub(crate) fn request_json(url: &str, headers: &[(&str, &str)], auth_errors: &[(u16, &str)]) -> Result<Value, FetchError> {
-    let mut request = ureq::get(url)
-        .timeout(Duration::from_secs(15))
-        .set("Accept", "application/json")
-        .set("User-Agent", USER_AGENT);
+    let mut request = ureq::get(url).header("Accept", "application/json").header("User-Agent", USER_AGENT);
     for (name, value) in headers {
-        request = request.set(name, value);
+        request = request.header(*name, *value);
     }
-    match request.call() {
-        Ok(response) => serde_json::from_reader(response.into_reader())
-            .map_err(|_| FetchError::new("Unexpected response from the Anthropic API.", ERROR_RETRY_SECONDS)),
-        Err(ureq::Error::Status(code, response)) => {
-            if let Some((_, message)) = auth_errors.iter().find(|(c, _)| *c == code) {
-                return Err(FetchError::auth(message));
-            }
-            if code == 429 {
-                let retry = response.header("Retry-After").and_then(|r| r.parse().ok()).unwrap_or(300.0);
-                return Err(FetchError::new("Rate limited by the Anthropic API, retrying later.", retry));
-            }
-            Err(FetchError::new(&format!("Anthropic API error (HTTP {code})."), ERROR_RETRY_SECONDS))
-        }
-        Err(ureq::Error::Transport(_)) => Err(FetchError::new("Offline, showing last known values.", ERROR_RETRY_SECONDS)),
+    // HTTP errors come back as responses, so a 429's Retry-After can be read.
+    let request = request.config().timeout_global(Some(Duration::from_secs(15))).http_status_as_error(false).build();
+    let Ok(response) = request.call() else {
+        return Err(FetchError::new("Offline, showing last known values.", ERROR_RETRY_SECONDS));
+    };
+    if response.status().is_success() {
+        return serde_json::from_reader(response.into_body().into_reader())
+            .map_err(|_| FetchError::new("Unexpected response from the Anthropic API.", ERROR_RETRY_SECONDS));
     }
+    let code = response.status().as_u16();
+    if let Some((_, message)) = auth_errors.iter().find(|(c, _)| *c == code) {
+        return Err(FetchError::auth(message));
+    }
+    if code == 429 {
+        let retry = response.headers().get("Retry-After").and_then(|r| r.to_str().ok()?.parse().ok()).unwrap_or(300.0);
+        return Err(FetchError::new("Rate limited by the Anthropic API, retrying later.", retry));
+    }
+    Err(FetchError::new(&format!("Anthropic API error (HTTP {code})."), ERROR_RETRY_SECONDS))
 }
 
 // --- Subscription limits ----------------------------------------------------

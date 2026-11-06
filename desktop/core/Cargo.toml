@@ -12,7 +12,7 @@ serde.workspace = true
 serde_json.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 dirs = "7"
-ureq = "2"
+ureq = "3"
 
 # The Admin API key lives in the Keychain or Credential Manager. On Linux it
 # goes through secret-tool, like the Python helper, so no D-Bus library is needed.
