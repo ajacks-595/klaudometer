@@ -12,6 +12,10 @@ use std::time::Duration;
 
 pub const USER_AGENT: &str = concat!("klaudometer-desktop/", env!("CARGO_PKG_VERSION"));
 const ERROR_RETRY_SECONDS: f64 = 60.0;
+const OFFLINE: &str = "Offline, showing last known values.";
+/// A renewal only starts once Anthropic's API has answered twice this far
+/// apart, so it doesn't start while the network is still settling after a wake-up.
+const NETWORK_SETTLE_SECONDS: u64 = 10;
 /// Usage windows the subscription endpoint reports, with their lengths.
 const WINDOWS: [(&str, f64); 2] = [("five_hour", 5.0 * 3600.0), ("seven_day", 7.0 * 86400.0)];
 
@@ -75,7 +79,7 @@ pub(crate) fn request_json(url: &str, headers: &[(&str, &str)], auth_errors: &[(
     // HTTP errors come back as responses, so a 429's Retry-After can be read.
     let request = request.config().timeout_global(Some(Duration::from_secs(15))).http_status_as_error(false).build();
     let Ok(response) = request.call() else {
-        return Err(FetchError::new("Offline, showing last known values.", ERROR_RETRY_SECONDS));
+        return Err(FetchError::new(OFFLINE, ERROR_RETRY_SECONDS));
     };
     if response.status().is_success() {
         return serde_json::from_reader(response.into_body().into_reader())
@@ -105,16 +109,45 @@ fn request_usage(env: &Env, login: &ClaudeLogin) -> Result<Value, FetchError> {
     )
 }
 
+/// Whether Anthropic's API answers at all. Any HTTP response will do.
+fn api_answers(env: &Env) -> bool {
+    ureq::head(format!("{}/", env.api_base))
+        .header("User-Agent", USER_AGENT)
+        .config()
+        .timeout_global(Some(Duration::from_secs(10)))
+        .http_status_as_error(false)
+        .build()
+        .call()
+        .is_ok()
+}
+
+/// Whether Anthropic's API answers now and again `NETWORK_SETTLE_SECONDS`
+/// later. Right after a wake-up the network can drop out again as it settles,
+/// and a renewal cut off mid-way can sign Claude Code out (see `renew_via_cli`).
+fn network_settled(env: &Env) -> bool {
+    if !api_answers(env) {
+        return false;
+    }
+    std::thread::sleep(Duration::from_secs(NETWORK_SETTLE_SECONDS));
+    api_answers(env)
+}
+
 /// Claude Code renews its login in the last few minutes before it runs out.
 /// When that's due, have Claude Code do it, then use whatever it saved.
 fn fetch_raw(env: &Env, now: f64) -> Result<(Value, ClaudeLogin), FetchError> {
     let mut login = load_claude_login(env)?;
-    for args in RENEW_COMMANDS {
-        if login.state(now) != LoginState::Due {
-            break;
+    if login.state(now) == LoginState::Due {
+        if !network_settled(env) {
+            return Err(FetchError::new(OFFLINE, ERROR_RETRY_SECONDS));
         }
-        renew_via_cli(args);
-        login = load_claude_login(env)?;
+        for args in RENEW_COMMANDS {
+            let finished = renew_via_cli(args);
+            login = load_claude_login(env)?;
+            // One still running saves its result when it's done.
+            if !finished || login.state(now) != LoginState::Due {
+                break;
+            }
+        }
     }
     match login.state(now) {
         LoginState::SignedOut => return Err(FetchError::signed_out(SIGNED_OUT)),

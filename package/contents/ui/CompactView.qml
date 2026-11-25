@@ -41,6 +41,16 @@ MouseArea {
         rowSpacing: Kirigami.Units.largeSpacing
         columnSpacing: Kirigami.Units.largeSpacing
 
+        // Signed out of Claude Code: say so, rather than look stuck on the
+        // last numbers. Clicking opens the card with Sign In.
+        Kirigami.Icon {
+            Layout.alignment: Qt.AlignCenter
+            Layout.preferredWidth: compact.ringSize
+            Layout.preferredHeight: compact.ringSize
+            visible: compact.plasmoidItem.needsSignIn
+            source: "dialog-warning"
+        }
+
         Repeater {
             model: compact.plasmoidItem.meterIds
 

@@ -73,6 +73,12 @@ CLAUDE_DIRS = [
 # version changes the first. (`claude auth status` can exit before its renewal
 # finishes, so it isn't reliable.)
 RENEW_COMMANDS = [["doctor"], ["plugin", "marketplace", "list"]]
+# How long to wait for one of those before carrying on without it. Claude Code
+# is never killed (see renew_via_cli).
+RENEW_WAIT_SECONDS = 60
+# A renewal only starts once Anthropic's API has answered twice this far apart,
+# so it doesn't start while the network is still settling after a wake-up.
+NETWORK_SETTLE_SECONDS = 10
 # Claude Code renews its access token in the last 5 minutes before it runs
 # out (and any time after, while its refresh token lasts).
 RENEW_MARGIN_SECONDS = 300
@@ -161,26 +167,57 @@ def find_claude():
 
 
 def renew_via_cli(args):
-    """Have Claude Code renew its own login (best effort).
+    """Have Claude Code renew its own login (best effort). Returns False if
+    it's still running after RENEW_WAIT_SECONDS.
 
     Klaudometer never renews the login itself: refresh tokens rotate, and
     racing Claude Code for one could log it out. Claude Code renews under its
-    own lock and saves the result where it always does.
+    own lock and saves the result where it always does. Nor is Claude Code
+    ever killed: stopping it after Anthropic has issued a new token, but before
+    it's saved, would leave only a spent one and sign Claude Code out. One that
+    takes longer is left to finish in its own session.
     """
     claude, path = find_claude()
     if not claude:
-        return
+        return True
     try:
-        subprocess.run(
+        proc = subprocess.Popen(
             [claude, *args],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            timeout=60,
             env={**os.environ, "PATH": path},
+            start_new_session=True,
         )
-    except (OSError, subprocess.SubprocessError):
+    except OSError:
+        return True
+    try:
+        proc.wait(timeout=RENEW_WAIT_SECONDS)
+    except subprocess.TimeoutExpired:
+        return False
+    return True
+
+
+def api_answers():
+    """Whether Anthropic's API answers at all. Any HTTP response will do."""
+    req = urllib.request.Request(API_BASE + "/", method="HEAD", headers={"User-Agent": USER_AGENT})
+    try:
+        urllib.request.urlopen(req, timeout=10).close()
+    except urllib.error.HTTPError:
         pass
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+    return True
+
+
+def network_settled():
+    """Whether Anthropic's API answers now and again NETWORK_SETTLE_SECONDS
+    later. Right after a wake-up the network can drop out again as it settles,
+    and a renewal cut off mid-way can sign Claude Code out (see renew_via_cli)."""
+    if not api_answers():
+        return False
+    time.sleep(NETWORK_SETTLE_SECONDS)
+    return api_answers()
 
 
 def request_usage(token):
@@ -193,11 +230,15 @@ def request_usage(token):
 
 def fetch_raw(now):
     creds = load_credentials()
-    for args in RENEW_COMMANDS:
-        if login_state(creds, now) != "due":
-            break
-        renew_via_cli(args)
-        creds = load_credentials()
+    if login_state(creds, now) == "due":
+        if not network_settled():
+            raise FetchError("Offline, showing last known values.")
+        for args in RENEW_COMMANDS:
+            finished = renew_via_cli(args)
+            creds = load_credentials()
+            # One still running saves its result when it's done.
+            if not finished or login_state(creds, now) != "due":
+                break
     state = login_state(creds, now)
     if state == "signed_out":
         raise FetchError(SIGNED_OUT, ERROR_RETRY_SECONDS, auth=True, sign_in=True)

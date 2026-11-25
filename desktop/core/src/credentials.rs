@@ -16,6 +16,9 @@ use std::time::{Duration, Instant};
 /// version changes the first. (`claude auth status` can exit before its renewal
 /// finishes, so it isn't reliable.)
 pub const RENEW_COMMANDS: &[&[&str]] = &[&["doctor"], &["plugin", "marketplace", "list"]];
+/// How long to wait for one of those before carrying on without it. Claude
+/// Code is never killed (see `renew_via_cli`).
+const RENEW_WAIT_SECONDS: u64 = 60;
 /// Claude Code renews its access token in the last 5 minutes before it runs
 /// out (and any time after, while its refresh token lasts).
 const RENEW_MARGIN_SECONDS: f64 = 300.0;
@@ -107,11 +110,35 @@ pub fn load_claude_login(env: &Env) -> Result<ClaudeLogin, FetchError> {
 }
 
 /// Have Claude Code renew its own login (best effort). It renews under its
-/// own lock and saves the result where it always does.
-pub fn renew_via_cli(args: &[&str]) {
-    if let Some(claude) = find_claude() {
-        let _ = run(&claude.to_string_lossy(), args, None, 60);
+/// own lock and saves the result where it always does. Returns false if it's
+/// still running after `RENEW_WAIT_SECONDS`.
+///
+/// Claude Code is never killed: stopping it after Anthropic has issued a new
+/// token, but before it's saved, would leave only a spent one and sign Claude
+/// Code out. One that takes longer is left to finish on its own.
+pub fn renew_via_cli(args: &[&str]) -> bool {
+    let Some(claude) = find_claude() else { return true };
+    let mut command = command(&claude.to_string_lossy());
+    command.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    // Its own process group, so nothing aimed at Klaudometer's reaches it.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
     }
+    let Ok(mut child) = command.spawn() else { return true };
+    let deadline = Instant::now() + Duration::from_secs(RENEW_WAIT_SECONDS);
+    while Instant::now() < deadline {
+        if !matches!(child.try_wait(), Ok(None)) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    // Reap it once it's done, so it doesn't linger as a zombie.
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    false
 }
 
 /// Open a terminal running `claude auth login`: Terminal on a Mac, a console
@@ -203,25 +230,34 @@ pub(crate) fn run_capture(program: &str, args: &[&str], timeout_secs: u64) -> Op
     run(program, args, None, timeout_secs).filter(|(ok, out)| *ok && !out.is_empty()).map(|(_, out)| out)
 }
 
-/// Run a program, optionally writing `input` to its stdin, and return whether
-/// it succeeded and its trimmed stdout. None if it can't start or times out.
-fn run(program: &str, args: &[&str], input: Option<&str>, timeout_secs: u64) -> Option<(bool, String)> {
-    use std::io::{Read, Write};
-    let mut command = if cfg!(windows) && program.to_lowercase().ends_with(".cmd") {
+/// A command for `program` that never shows a console window on Windows, and
+/// runs `.cmd` launchers (npm installs) through cmd.
+fn command(program: &str) -> Command {
+    let command = if cfg!(windows) && program.to_lowercase().ends_with(".cmd") {
         let mut c = Command::new("cmd");
         c.arg("/C").arg(program);
         c
     } else {
         Command::new(program)
     };
-    let stdin = if input.is_some() { Stdio::piped() } else { Stdio::null() };
-    command.args(args).stdin(stdin).stdout(Stdio::piped()).stderr(Stdio::null());
     #[cfg(windows)]
-    {
+    let command = {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let mut command = command;
         command.creation_flags(CREATE_NO_WINDOW);
-    }
+        command
+    };
+    command
+}
+
+/// Run a program, optionally writing `input` to its stdin, and return whether
+/// it succeeded and its trimmed stdout. None if it can't start or times out.
+fn run(program: &str, args: &[&str], input: Option<&str>, timeout_secs: u64) -> Option<(bool, String)> {
+    use std::io::{Read, Write};
+    let mut command = command(program);
+    let stdin = if input.is_some() { Stdio::piped() } else { Stdio::null() };
+    command.args(args).stdin(stdin).stdout(Stdio::piped()).stderr(Stdio::null());
     let mut child = command.spawn().ok()?;
     if let (Some(input), Some(mut pipe)) = (input, child.stdin.take()) {
         // Dropping the pipe afterwards closes it, so the program sees the end.
