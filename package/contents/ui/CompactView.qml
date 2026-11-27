@@ -52,7 +52,8 @@ MouseArea {
         }
 
         Repeater {
-            model: compact.plasmoidItem.meterIds
+            // A fixed model; see allMeterIds in main.qml.
+            model: compact.plasmoidItem.allMeterIds
 
             delegate: GridLayout {
                 id: cell
@@ -60,6 +61,7 @@ MouseArea {
                 required property var modelData
                 readonly property var info: compact.plasmoidItem.meters[modelData]
 
+                visible: compact.plasmoidItem.meterIds.includes(modelData)
                 flow: compact.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
                 rowSpacing: 0
                 columnSpacing: Kirigami.Units.smallSpacing

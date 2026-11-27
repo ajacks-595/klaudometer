@@ -82,10 +82,12 @@ ColumnLayout {
         spacing: Kirigami.Units.largeSpacing
 
         Repeater {
-            model: full.plasmoidItem.meterIds
+            // A fixed model; see allMeterIds in main.qml.
+            model: full.plasmoidItem.allMeterIds
 
             delegate: Gauge {
                 required property var modelData
+                visible: full.plasmoidItem.meterIds.includes(modelData)
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
                 Layout.alignment: Qt.AlignTop

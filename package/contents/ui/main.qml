@@ -120,6 +120,14 @@ PlasmoidItem {
         return ids.length > 0 ? ids : ["five_hour", "seven_day"];
     }
 
+    // Every meter, in display order. The views repeat over this fixed list
+    // and hide the meters not in meterIds, so a meter turning on or off never
+    // destroys a delegate. Qt Quick Layouts read their child list without
+    // rebuilding it until they're next polished, and the full view isn't
+    // polished while the panel view shows. Destroyed delegates crashed Plasma
+    // as soon as it checked the full view's size.
+    readonly property var allMeterIds: ["five_hour", "seven_day", "extra", "api"]
+
     // Live state of every meter. Views look meters up by id so they update in
     // place instead of being recreated on every tick.
     readonly property var meters: ({
